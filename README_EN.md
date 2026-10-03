@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="docs/logo.png" alt="WorldX logo: pixel-art infinity symbol transitioning from nature to digital grid" width="200" />
+  <img src="docs/logo.png" alt="World-Y logo: pixel-art infinity symbol transitioning from nature to digital grid" width="200" />
 </p>
 
 <p align="center">
-  <!-- <h1 align="center">WorldX</h1> -->
+  <!-- <h1 align="center">World-Y</h1> -->
   <p align="center"><strong>One sentence, One living world.</strong></p>
 </p>
 
@@ -30,14 +30,14 @@
 ## Powered by Atlas Cloud
 
 <p align="center">
-  <a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=WorldX">
+  <a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=World-Y">
     <img src="docs/atlas-cloud-logo.png" alt="Atlas Cloud" width="180" />
   </a>
 </p>
 
-[**Atlas Cloud**](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=WorldX) provides WorldX with a single OpenAI-compatible API for both LLM (story & character generation) and image generation (maps, character visuals) — 59 curated LLM models + 300+ image/video models under one key.
+[**Atlas Cloud**](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=World-Y) provides World-Y with a single OpenAI-compatible API for both LLM (story & character generation) and image generation (maps, character visuals) — 59 curated LLM models + 300+ image/video models under one key.
 
-**Quick setup — all 4 WorldX roles via Atlas Cloud:**
+**Quick setup — all 4 World-Y roles via Atlas Cloud:**
 
 ```env
 # Orchestrator — world design & character rules
@@ -85,11 +85,11 @@ Get your free key → [atlascloud.ai/console/coding-plan](https://www.atlascloud
 
 ---
 
-**WorldX** turns a single text prompt into a fully autonomous AI world. The system designs the world, generates original maps and character art, then runs a living simulation where AI agents make decisions, form relationships, have conversations, and create emergent narratives — all without human intervention.
+**World-Y** turns a single text prompt into a fully autonomous AI world. The system designs the world, generates original maps and character art, then runs a living simulation where AI agents make decisions, form relationships, have conversations, and create emergent narratives — all without human intervention.
 
 > "A cozy autumn mountain village with a blacksmith, a tavern owner, a wandering monk, and a curious child"
 
-That's all it takes. WorldX handles the rest.
+That's all it takes. World-Y handles the rest.
 
 ## Highlights
 
@@ -104,8 +104,8 @@ That's all it takes. WorldX handles the rest.
 
 <table>
 <tr>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot1_en.png" alt="WorldX: one-sentence world creation interface" width="400"/></td>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot2_en.png" alt="WorldX: pixel world simulation with character dialogue sidebar" width="400"/></td>
+<td align="center" valign="top" width="50%"><img src="docs/screenshot1_en.png" alt="World-Y: one-sentence world creation interface" width="400"/></td>
+<td align="center" valign="top" width="50%"><img src="docs/screenshot2_en.png" alt="World-Y: pixel world simulation with character dialogue sidebar" width="400"/></td>
 </tr>
 </table>
 <br>   
@@ -121,11 +121,11 @@ That's all it takes. WorldX handles the rest.
 
 ### Option A: Preview Mode (fastest)
 
-Just want to see WorldX in action? Two pre-built worlds are included. You only need a **Simulation** model key.
+Just want to see World-Y in action? Two pre-built worlds are included. You only need a **Simulation** model key.
 
 ```bash
-git clone https://github.com/YGYOOO/WorldX.git
-cd WorldX
+git clone https://github.com/YGYOOO/World-Y.git
+cd World-Y
 cp .env.example .env
 # Edit .env — fill in SIMULATION_* fields only
 npm install
@@ -153,7 +153,7 @@ npm run create -- "A cyberpunk noodle shop where hackers and androids share rumo
 
 ## Model Configuration
 
-WorldX uses **4 model roles**, each configurable independently. All roles use the OpenAI-compatible `chat/completions` protocol except Image Gen, which can also use Google AI Studio's native image API.
+World-Y uses **4 model roles**, each configurable independently. All roles use the OpenAI-compatible `chat/completions` protocol except Image Gen, which can also use Google AI Studio's native image API.
 
 | Role | Env Prefix | What It Does | Recommended |
 |------|-----------|-------------|-------------|
@@ -289,7 +289,7 @@ SIMULATION_MODEL=deepseek-chat
 ## Project Structure
 
 ```
-WorldX/
+World-Y/
 ├── orchestrator/         # LLM-driven world design & config generation
 │   ├── src/
 │   │   ├── index.mjs           # Pipeline entry: sentence → world

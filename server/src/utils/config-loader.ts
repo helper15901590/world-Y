@@ -57,7 +57,7 @@ export function persistCharacterProfilePatch(
       fs.renameSync(tmpPath, filePath);
       return true;
     } catch (err) {
-      console.warn(`[WorldX] 角色 ${charId} 的人设写回配置文件失败:`, err);
+      console.warn(`[World-Y] 角色 ${charId} 的人设写回配置文件失败:`, err);
       return false;
     }
   }
@@ -82,7 +82,7 @@ export function createCharacterConfigFile(
     fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
     return true;
   } catch (err) {
-    console.warn(`[WorldX] 角色 ${charId} 的配置文件创建失败:`, err);
+    console.warn(`[World-Y] 角色 ${charId} 的配置文件创建失败:`, err);
     return false;
   }
 }
@@ -127,7 +127,7 @@ export function registerNewCharacterAssets(params: {
         result.spriteCopied = true;
       }
     } catch (err) {
-      console.warn(`[WorldX] 复制精灵资源失败（${params.spriteSourceId} → ${params.id}）:`, err);
+      console.warn(`[World-Y] 复制精灵资源失败（${params.spriteSourceId} → ${params.id}）:`, err);
     }
   }
 
@@ -147,7 +147,7 @@ export function registerNewCharacterAssets(params: {
       }
     }
   } catch (err) {
-    console.warn(`[WorldX] 更新角色清单失败（${params.id}）:`, err);
+    console.warn(`[World-Y] 更新角色清单失败（${params.id}）:`, err);
   }
 
   return result;
@@ -197,7 +197,7 @@ export function persistEnvironmentPatch(params: {
       fs.renameSync(tmpPath, filePath);
       return true;
     } catch (err) {
-      console.warn("[WorldX] 环境/物件配置写回失败:", err);
+      console.warn("[World-Y] 环境/物件配置写回失败:", err);
       return false;
     }
   }
@@ -223,7 +223,7 @@ export function deleteCharacterFiles(charId: string): {
       fs.rmSync(configPath, { force: true });
       result.configRemoved = true;
     } catch (err) {
-      console.warn(`[WorldX] 删除角色配置失败（${charId}）:`, err);
+      console.warn(`[World-Y] 删除角色配置失败（${charId}）:`, err);
     }
   }
 
@@ -233,7 +233,7 @@ export function deleteCharacterFiles(charId: string): {
       fs.rmSync(assetDir, { recursive: true, force: true });
       result.assetsRemoved = true;
     } catch (err) {
-      console.warn(`[WorldX] 删除角色立绘失败（${charId}）:`, err);
+      console.warn(`[World-Y] 删除角色立绘失败（${charId}）:`, err);
     }
   }
 
@@ -250,7 +250,7 @@ export function deleteCharacterFiles(charId: string): {
       }
     }
   } catch (err) {
-    console.warn(`[WorldX] 更新角色清单失败（${charId}）:`, err);
+    console.warn(`[World-Y] 更新角色清单失败（${charId}）:`, err);
   }
 
   return result;
@@ -279,7 +279,7 @@ export function persistWorldConfigPatch(patch: Record<string, unknown>): boolean
       fs.renameSync(tmpPath, filePath);
       return true;
     } catch (err) {
-      console.warn("[WorldX] 世界设定写回配置文件失败:", err);
+      console.warn("[World-Y] 世界设定写回配置文件失败:", err);
       return false;
     }
   }

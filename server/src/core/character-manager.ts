@@ -174,7 +174,7 @@ export class CharacterManager {
     // 写回世界目录里的角色配置文件：界面上的修改立即生效，且重启后不丢失。
     if (!persistCharacterProfilePatch(charId, cleaned)) {
       console.warn(
-        `[WorldX] 角色 ${charId} 的人设已生效，但未能写回配置文件（重启后会恢复为文件内容）。`,
+        `[World-Y] 角色 ${charId} 的人设已生效，但未能写回配置文件（重启后会恢复为文件内容）。`,
       );
     }
 
@@ -346,7 +346,7 @@ export class CharacterManager {
         actionEndTick: 0,
       });
     } catch (err) {
-      console.warn(`[WorldX] 应用锚定失败（${charId}）:`, err);
+      console.warn(`[World-Y] 应用锚定失败（${charId}）:`, err);
     }
   }
 
@@ -419,7 +419,7 @@ export class CharacterManager {
     try {
       getDb().prepare("DELETE FROM diary_entries WHERE character_id = ?").run(charId);
     } catch (err) {
-      console.warn(`[WorldX] 删除角色 ${charId} 的日记失败:`, err);
+      console.warn(`[World-Y] 删除角色 ${charId} 的日记失败:`, err);
     }
   }
 

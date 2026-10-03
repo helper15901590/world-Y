@@ -65,13 +65,13 @@ async function main() {
 
   const worldDir = resolveInitialWorldDir();
   if (worldDir) {
-    console.log(`[WorldX] World dir: ${worldDir}`);
+    console.log(`[World-Y] World dir: ${worldDir}`);
   } else {
-    console.log("[WorldX] No generated world found — server starting in empty mode. Navigate to /create to generate your first world.");
+    console.log("[World-Y] No generated world found — server starting in empty mode. Navigate to /create to generate your first world.");
   }
 
   await appContext.initialize(worldDir);
-  console.log("[WorldX] All systems initialized");
+  console.log("[World-Y] All systems initialized");
 
   app.get("/api/health", (_req, res) => {
     if (!appContext.hasWorld) {
@@ -126,12 +126,12 @@ async function main() {
 
   const PORT = process.env.PORT || 3100;
   server.listen(PORT, () => {
-    console.log(`[WorldX] Server running on http://localhost:${PORT}`);
-    console.log(`[WorldX] WebSocket available on ws://localhost:${PORT}`);
+    console.log(`[World-Y] Server running on http://localhost:${PORT}`);
+    console.log(`[World-Y] WebSocket available on ws://localhost:${PORT}`);
   });
 }
 
 main().catch((err) => {
-  console.error("[WorldX] Fatal error during startup:", err);
+  console.error("[World-Y] Fatal error during startup:", err);
   process.exit(1);
 });

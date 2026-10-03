@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// `server/src/core` is 3 levels below WorldX root.
+// `server/src/core` is 3 levels below World-Y root.
 const WORLDSPARK_ROOT = path.resolve(__dirname, "../../..");
 const ORCHESTRATOR_ENTRY = path.join(WORLDSPARK_ROOT, "orchestrator/src/index.mjs");
 const GENERATED_WORLDS_DIR = path.join(WORLDSPARK_ROOT, "output/worlds");
@@ -284,7 +284,7 @@ class CreateJobManager extends EventEmitter {
       writeFileSync(
         logPath,
         [
-          `=== WorldX Generation Log — ${new Date(job.startedAt).toISOString()} ===`,
+          `=== World-Y Generation Log — ${new Date(job.startedAt).toISOString()} ===`,
           `Job ID: ${job.jobId}`,
           `World ID: ${worldId}`,
           `Prompt: ${job.prompt}`,

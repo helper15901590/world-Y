@@ -211,7 +211,7 @@ export function TopBar({
     setTimeout(() => setShowPauseToast(false), 3500);
   };
 
-  const worldName = worldInfo?.worldName || "WorldX";
+  const worldName = worldInfo?.worldName || "World-Y";
   const period = gameTime.period ? translatePeriod(gameTime.period) : "";
   const timeLabel = gameTime.timeString
     ? (period
@@ -366,7 +366,7 @@ export function TopBar({
     return (
       <div ref={barRef} style={topBarStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>🔒 WorldX</span>
+          <span style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>🔒 World-Y</span>
           <span style={{ fontSize: 11, opacity: 0.65 }}>{t("topbar.adminLockHint")}</span>
           <input
             type="password"

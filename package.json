@@ -1,8 +1,8 @@
 {
-  "name": "worldx",
+  "name": "world-y",
   "version": "0.1.0",
   "private": true,
-  "repository": "git@github.com:YGYOOO/WorldX.git",
+  "repository": "https://github.com/helper15901590/world-Y.git",
   "type": "module",
   "scripts": {
     "postinstall": "cd client && npm install && cd ../server && npm install && cd ../orchestrator && npm install && cd ../generators && npm install",

@@ -14,7 +14,7 @@ export const HELP_CONTENT: Record<"zh" | "en", HelpSection[]> = {
     {
       title: "这是什么",
       items: [
-        "WorldX 是一个「一句话生成一个活的 AI 世界」的模拟器：你描述一个小镇，AI 会生成地图、角色和他们的生活。",
+        "World-Y 是一个「一句话生成一个活的 AI 世界」的模拟器：你描述一个小镇，AI 会生成地图、角色和他们的生活。",
         "世界里的居民会自己决定去哪里、做什么、和谁说话——你可以像看一部慢直播一样观察他们。",
         "世界靠「回合」推进：每个回合代表世界里的十几到几十分钟，角色每回合做一次决定。",
       ],
@@ -96,7 +96,7 @@ export const HELP_CONTENT: Record<"zh" | "en", HelpSection[]> = {
     {
       title: "What this is",
       items: [
-        "WorldX turns one sentence into a living AI world: describe a town, and AI generates the map, the residents and their daily lives.",
+        "World-Y turns one sentence into a living AI world: describe a town, and AI generates the map, the residents and their daily lives.",
         "Residents decide on their own where to go, what to do and whom to talk to — you watch it like a slow livestream.",
         "The world advances in ticks: each tick is tens of minutes of world time, and every character makes one decision per tick.",
       ],

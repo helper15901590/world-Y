@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/logo.png" alt="WorldX logo:d" width="200" />
+  <img src="docs/logo.png" alt="World-Y logo:d" width="200" />
 </p>
 <p align="center">
-  <!-- <h1 align="center">WorldX</h1> -->
+  <!-- <h1 align="center">World-Y</h1> -->
   <p align="center"><strong>一句话，生成一个鲜活的 AI 世界。</strong></p>
 </p>
 
@@ -26,21 +26,21 @@
 
 ---
 
-说出你的要求，**WorldX** 会为你构筑一个完整的虚拟世界。
+说出你的要求，**World-Y** 会为你构筑一个完整的虚拟世界。
 AI 角色们会在这个世界里自主生活：他们做决策、与场景交互、建立关系、开展对话、记忆并思考，涌现出没人提前写好剧本的故事。
 你也可以作为"上帝"随时介入 —— 注入事件、编辑角色记忆或人格，看整个世界因此走向何方。你也能与任意角色展开一场架空对话。
 
 > "北宋汴京的夜市街，有算命的、当铺掌柜、小偷、捕快，还有一个穿越来的现代人"
 
-只需要这一句话，剩下的交给 WorldX。
+只需要这一句话，剩下的交给 World-Y。
 <table>
 <tr>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot1.png" alt="WorldX: one-sentence world creation interface" width="400"/></td>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot2.png" alt="WorldX: pixel world simulation with character dialogue sidebar" width="400"/></td>
+<td align="center" valign="top" width="50%"><img src="docs/screenshot1.png" alt="World-Y: one-sentence world creation interface" width="400"/></td>
+<td align="center" valign="top" width="50%"><img src="docs/screenshot2.png" alt="World-Y: pixel world simulation with character dialogue sidebar" width="400"/></td>
 </tr>
 <tr>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot3.png" alt="WorldX: pixel world simulation with character dialogue sidebar" width="400"/></td>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot2_en.png" alt="WorldX: one-sentence world creation interface" width="400"/></td>
+<td align="center" valign="top" width="50%"><img src="docs/screenshot3.png" alt="World-Y: pixel world simulation with character dialogue sidebar" width="400"/></td>
+<td align="center" valign="top" width="50%"><img src="docs/screenshot2_en.png" alt="World-Y: one-sentence world creation interface" width="400"/></td>
 </tr>
 </table>
 
@@ -79,8 +79,8 @@ AI 角色们会在这个世界里自主生活：他们做决策、与场景交�
 想先看看效果？项目内置了两个预生成的世界，配置 **世界驱动** 模型的大模型即可运行。
 
 ```bash
-git clone https://github.com/YGYOOO/WorldX.git
-cd WorldX
+git clone https://github.com/YGYOOO/World-Y.git
+cd World-Y
 cp .env.example .env
 # 编辑 .env —— 只填 SIMULATION_* 三行即可
 npm install
@@ -108,7 +108,7 @@ npm run create -- "赛博朋克风格的深夜拉面馆，黑客和仿生人在�
 
 ## 模型配置
 
-WorldX 使用 **4 个模型角色**，各自独立配置。除绘图模型支持 Google AI Studio 原生图片接口外，其余角色均采用 OpenAI 兼容的 `chat/completions` 协议。
+World-Y 使用 **4 个模型角色**，各自独立配置。除绘图模型支持 Google AI Studio 原生图片接口外，其余角色均采用 OpenAI 兼容的 `chat/completions` 协议。
 
 
 | 角色       | 环境变量前缀          | 用途             | 推荐模型                                      |
@@ -250,7 +250,7 @@ https://zhuanlan.zhihu.com/p/2032410449854068566
 
 ## 项目结构
 ```
-WorldX/
+World-Y/
 ├── orchestrator/         # LLM 驱动的世界设计与配置生成
 │   ├── src/
 │   │   ├── index.mjs           # 管线入口：一句话 → 世界
@@ -294,7 +294,7 @@ npm run create       # 通过命令行直接生成新世界
 
 ## 感谢
 -  [LinuxDO](https://linux.do/)
--  [AtomGit](https://atomgit.com/YGYOOO/WorldX)：在国内托管 WorldX，帮助中国大陆用户更快访问项目与下载Release
+-  [AtomGit](https://atomgit.com/YGYOOO/World-Y)：在国内托管 World-Y，帮助中国大陆用户更快访问项目与下载Release
 
 ## License
 MIT

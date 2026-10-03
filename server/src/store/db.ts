@@ -35,7 +35,7 @@ function assertSqliteSupported(): void {
 
   if (!supported) {
     throw new Error(
-      `[WorldX] 当前 Node.js 版本为 ${process.versions.node}，但内置 node:sqlite 需要 ` +
+      `[World-Y] 当前 Node.js 版本为 ${process.versions.node}，但内置 node:sqlite 需要 ` +
         `>=22.13 <23 || >=23.4（推荐 24 LTS）。22.5 ~ 22.12 与 23.0 ~ 23.3 期间该模块仍在 ` +
         `--experimental-sqlite 标志之后，无法使用。请升级 Node.js 后重试。`,
     );
@@ -55,19 +55,19 @@ function loadSqlite(): SqliteModule {
   return sqliteModule;
 }
 
-export interface WorldXRunResult {
+export interface WorldYRunResult {
   changes: number | bigint;
   lastInsertRowid: number | bigint;
 }
 
-export interface WorldXStatement {
-  run(...params: unknown[]): WorldXRunResult;
+export interface WorldYStatement {
+  run(...params: unknown[]): WorldYRunResult;
   get(...params: unknown[]): any;
   all(...params: unknown[]): any[];
 }
 
-export interface WorldXDatabase {
-  prepare(sql: string): WorldXStatement;
+export interface WorldYDatabase {
+  prepare(sql: string): WorldYStatement;
   exec(sql: string): void;
   /** 返回 PRAGMA 结果行，与 better-sqlite3 一致：调用方要靠它判断 PRAGMA 是否真的生效。 */
   pragma(source: string): any[];
@@ -98,14 +98,14 @@ function normalizeParams(params: unknown[]): SqliteValue[] {
       return p as SqliteValue;
     }
     throw new TypeError(
-      `[WorldX] 第 ${i + 1} 个绑定参数的类型 ${
+      `[World-Y] 第 ${i + 1} 个绑定参数的类型 ${
         Object.prototype.toString.call(p)
       } 无法写入 SQLite，请先自行序列化（对象/数组请用 JSON.stringify）。`,
     );
   });
 }
 
-class SqliteDatabase implements WorldXDatabase {
+class SqliteDatabase implements WorldYDatabase {
   private readonly inner: DatabaseSyncType;
   /** 当前事务嵌套深度，0 表示不在事务中。用于把嵌套事务降级为 SAVEPOINT。 */
   private txDepth = 0;
@@ -122,11 +122,11 @@ class SqliteDatabase implements WorldXDatabase {
     this.pragma("busy_timeout = 5000");
   }
 
-  prepare(sql: string): WorldXStatement {
+  prepare(sql: string): WorldYStatement {
     const stmt: StatementSync = this.inner.prepare(sql);
     return {
       run: (...params: unknown[]) =>
-        stmt.run(...normalizeParams(params)) as WorldXRunResult,
+        stmt.run(...normalizeParams(params)) as WorldYRunResult,
       get: (...params: unknown[]) => stmt.get(...normalizeParams(params)),
       all: (...params: unknown[]) => stmt.all(...normalizeParams(params)),
     };
@@ -147,7 +147,7 @@ class SqliteDatabase implements WorldXDatabase {
       // 与 better-sqlite3 一致：嵌套调用降级为 SAVEPOINT，而不是让 SQLite 抛
       // "cannot start a transaction within a transaction"。
       const nested = this.txDepth > 0;
-      const savepoint = `worldx_sp_${this.txDepth}`;
+      const savepoint = `worldy_sp_${this.txDepth}`;
 
       this.inner.exec(nested ? `SAVEPOINT ${savepoint}` : "BEGIN");
       this.txDepth += 1;
@@ -158,7 +158,7 @@ class SqliteDatabase implements WorldXDatabase {
         // 真正执行前就跑完，写入落在事务之外且毫无原子性。
         if (result instanceof Promise) {
           throw new TypeError(
-            "[WorldX] 事务函数不能返回 Promise：COMMIT 会在异步写入完成前执行，" +
+            "[World-Y] 事务函数不能返回 Promise：COMMIT 会在异步写入完成前执行，" +
               "导致写入脱离事务。请改用同步函数。",
           );
         }
@@ -191,7 +191,7 @@ class SqliteDatabase implements WorldXDatabase {
   }
 }
 
-let db: WorldXDatabase | null = null;
+let db: WorldYDatabase | null = null;
 let currentDbPath: string | null = null;
 
 const SCHEMA_SQL = `
@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS content_candidates (
 );
 `;
 
-export function initDatabase(dbPath?: string): WorldXDatabase {
+export function initDatabase(dbPath?: string): WorldYDatabase {
   // 版本不满足时在这里就给出可读的报错，而不是等 node:sqlite 解析失败。
   assertSqliteSupported();
 
@@ -336,7 +336,7 @@ export function initDatabase(dbPath?: string): WorldXDatabase {
     const mode = journalMode?.journal_mode?.toLowerCase();
     if (mode !== "wal") {
       console.warn(
-        `[WorldX] journal_mode 未能切换到 WAL（当前为 ${mode ?? "unknown"}）。` +
+        `[World-Y] journal_mode 未能切换到 WAL（当前为 ${mode ?? "unknown"}）。` +
           `数据库仍可使用，但并发读写与快照一致性会变差，常见原因是数据目录位于网络文件系统或只读。`,
       );
     } else {
@@ -366,7 +366,7 @@ export function initDatabase(dbPath?: string): WorldXDatabase {
   return db;
 }
 
-function runMigrations(database: WorldXDatabase): void {
+function runMigrations(database: WorldYDatabase): void {
   const hasColumn = database
     .prepare(`PRAGMA table_info(memories)`)
     .all()
@@ -384,7 +384,7 @@ function runMigrations(database: WorldXDatabase): void {
   }
 }
 
-export function getDb(): WorldXDatabase {
+export function getDb(): WorldYDatabase {
   if (!db) {
     throw new Error("Database not initialized. Call initDatabase() first.");
   }
