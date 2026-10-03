@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="docs/logo.png" alt="World-Y logo: pixel-art infinity symbol transitioning from nature to digital grid" width="200" />
-</p>
-
-<p align="center">
   <!-- <h1 align="center">World-Y</h1> -->
   <p align="center"><strong>One sentence, One living world.</strong></p>
 </p>
@@ -28,12 +24,6 @@
 ---
 
 ## Powered by Atlas Cloud
-
-<p align="center">
-  <a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=World-Y">
-    <img src="docs/atlas-cloud-logo.png" alt="Atlas Cloud" width="180" />
-  </a>
-</p>
 
 [**Atlas Cloud**](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=World-Y) provides World-Y with a single OpenAI-compatible API for both LLM (story & character generation) and image generation (maps, character visuals) — 59 curated LLM models + 300+ image/video models under one key.
 
@@ -102,13 +92,7 @@ That's all it takes. World-Y handles the rest.
 - **Timeline system** — branch, replay, and compare different simulation runs
 - **Bilingual UI** — Chinese / English interface with one-click switching
 
-<table>
-<tr>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot1_en.png" alt="World-Y: one-sentence world creation interface" width="400"/></td>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot2_en.png" alt="World-Y: pixel world simulation with character dialogue sidebar" width="400"/></td>
-</tr>
-</table>
-<br>   
+<br>
 
 > 🚧 The project is currently in Alpha — core features work, ongoing improvements ahead
 
@@ -124,7 +108,7 @@ That's all it takes. World-Y handles the rest.
 Just want to see World-Y in action? Two pre-built worlds are included. You only need a **Simulation** model key.
 
 ```bash
-git clone https://github.com/YGYOOO/World-Y.git
+git clone https://github.com/helper15901590/world-Y.git
 cd World-Y
 cp .env.example .env
 # Edit .env — fill in SIMULATION_* fields only
@@ -281,10 +265,6 @@ SIMULATION_MODEL=deepseek-chat
 ```
 
 </details>
-
-## Architecture
-<img src="docs/chart1_en.png"/>
-<img src="docs/chart2_en.png"/>
 
 ## Project Structure
 

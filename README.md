@@ -1,7 +1,4 @@
 <p align="center">
-  <img src="docs/logo.png" alt="World-Y logo:d" width="200" />
-</p>
-<p align="center">
   <!-- <h1 align="center">World-Y</h1> -->
   <p align="center"><strong>一句话，生成一个鲜活的 AI 世界。</strong></p>
 </p>
@@ -33,16 +30,6 @@ AI 角色们会在这个世界里自主生活：他们做决策、与场景交�
 > "北宋汴京的夜市街，有算命的、当铺掌柜、小偷、捕快，还有一个穿越来的现代人"
 
 只需要这一句话，剩下的交给 World-Y。
-<table>
-<tr>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot1.png" alt="World-Y: one-sentence world creation interface" width="400"/></td>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot2.png" alt="World-Y: pixel world simulation with character dialogue sidebar" width="400"/></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot3.png" alt="World-Y: pixel world simulation with character dialogue sidebar" width="400"/></td>
-<td align="center" valign="top" width="50%"><img src="docs/screenshot2_en.png" alt="World-Y: one-sentence world creation interface" width="400"/></td>
-</tr>
-</table>
 
 <p align="center">
   <a href="https://www.bilibili.com/video/BV1HNosBLEE5">
@@ -79,7 +66,7 @@ AI 角色们会在这个世界里自主生活：他们做决策、与场景交�
 想先看看效果？项目内置了两个预生成的世界，配置 **世界驱动** 模型的大模型即可运行。
 
 ```bash
-git clone https://github.com/YGYOOO/World-Y.git
+git clone https://github.com/helper15901590/world-Y.git
 cd World-Y
 cp .env.example .env
 # 编辑 .env —— 只填 SIMULATION_* 三行即可
@@ -241,10 +228,6 @@ npm run dev
 
 
 
-## 架构  
-<img src="docs/chart1.png"/>
-<img src="docs/chart2.png"/>
-
 ## 详细技术介绍
 https://zhuanlan.zhihu.com/p/2032410449854068566
 
@@ -288,13 +271,9 @@ npm run create       # 通过命令行直接生成新世界
 - 客户端：`http://localhost:3200`
 - 服务器：`http://localhost:3100`
 
-## 交流群
-<img src="docs/qq_group.jpg" width="200px"/>
-
-
 ## 感谢
 -  [LinuxDO](https://linux.do/)
--  [AtomGit](https://atomgit.com/YGYOOO/World-Y)：在国内托管 World-Y，帮助中国大陆用户更快访问项目与下载Release
+-  [AtomGit](https://atomgit.com/YGYOOO/WorldX)：上游 WorldX 项目的国内镜像，帮助中国大陆用户更快访问原项目与下载 Release
 
 ## License
 MIT
