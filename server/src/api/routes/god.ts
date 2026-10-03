@@ -4,6 +4,7 @@ import { appContext } from "../../services/app-context.js";
 import * as eventStore from "../../store/event-store.js";
 import { generateId } from "../../utils/id-generator.js";
 import type { SimulationEvent, MemoryType } from "../../types/index.js";
+import { requireAdmin } from "../../services/admin-auth.js";
 
 const router = Router();
 
@@ -15,7 +16,7 @@ const router = Router();
  * decision / dialogue 都能看到"[广播] <content>"。可选：向每个在范围内的角色补写一条
  * 低重要性 observation 记忆，方便日后回忆。
  */
-router.post("/broadcast", (req: Request, res: Response) => {
+router.post("/broadcast", requireAdmin, (req: Request, res: Response) => {
   const { content, scope, tone, tags, writeMemory } = req.body ?? {};
 
   if (typeof content !== "string" || content.trim().length === 0) {
@@ -82,7 +83,7 @@ router.post("/broadcast", (req: Request, res: Response) => {
  *
  * 向指定角色耳语 / 托梦，新增一条记忆。默认 type="observation"，importance=8。
  */
-router.post("/whisper", (req: Request, res: Response) => {
+router.post("/whisper", requireAdmin, (req: Request, res: Response) => {
   const { characterId, content, importance, type, tags, emotionalValence, emotionalIntensity } =
     req.body ?? {};
 

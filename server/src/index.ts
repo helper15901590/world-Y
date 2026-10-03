@@ -10,6 +10,7 @@ import { appContext } from "./services/app-context.js";
 import { setupWebSocket } from "./api/websocket.js";
 
 import worldRoutes from "./api/routes/world.js";
+import adminRoutes from "./api/routes/admin.js";
 import worldsCreateRoutes from "./api/routes/worlds-create.js";
 import characterRoutes from "./api/routes/characters.js";
 import eventsRoutes from "./api/routes/events.js";
@@ -87,6 +88,7 @@ async function main() {
   });
 
   // World creation & management routes work even without an active world.
+  app.use("/api/admin", adminRoutes);
   app.use("/api/worlds", worldsCreateRoutes);
 
   // Guard: all other API routes require an active world to be loaded.

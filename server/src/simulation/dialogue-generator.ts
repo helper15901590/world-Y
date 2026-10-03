@@ -336,7 +336,12 @@ export class DialogueGenerator {
       .map((p) => {
         const nickname =
           p.nickname && p.nickname !== p.name ? `，又称${p.nickname}` : "";
-        return `- ${p.name}（${p.id} / ${p.role}${nickname}）`;
+        // 身份信息取「改人设」里的部门/岗位/职位（role 已不再进入提示词）
+        const identity = [p.department, p.position, p.jobTitle]
+          .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+          .join("·");
+        const identityPart = identity ? ` / ${identity}` : "";
+        return `- ${p.name}（${p.id}${identityPart}${nickname}）`;
       })
       .join("\n");
   }

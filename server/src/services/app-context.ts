@@ -6,6 +6,7 @@ import { PromptBuilder } from "../llm/prompt-builder.js";
 import { SimulationEngine } from "../simulation/simulation-engine.js";
 import { DecisionMaker } from "../simulation/decision-maker.js";
 import { DialogueGenerator } from "../simulation/dialogue-generator.js";
+import { QuestPlanner } from "../simulation/quest-planner.js";
 import { initDatabase, closeDb } from "../store/db.js";
 import { reloadConfigs } from "../utils/config-loader.js";
 import { TimelineManager } from "./timeline-manager.js";
@@ -174,11 +175,19 @@ export class AppContext {
     }
     this.promptBuilder.setContentLanguage(this.worldManager.getContentLanguage());
 
+    const questPlanner = new QuestPlanner(
+      this.llmClient,
+      this.promptBuilder,
+      this.characterManager,
+      this.worldManager,
+    );
+
     this.decisionMaker = new DecisionMaker(
       this.llmClient,
       this.promptBuilder,
       this.characterManager,
       this.worldManager,
+      questPlanner,
     );
 
     this.dialogueGenerator = new DialogueGenerator(
@@ -193,7 +202,13 @@ export class AppContext {
       this.characterManager,
       this.llmClient,
       this.promptBuilder,
+      questPlanner,
     );
+  }
+
+  /** 核心任务行动计划的读写入口（路由与模拟引擎共用同一实例） */
+  get questPlanner(): QuestPlanner | null {
+    return this.simulationEngine?.questPlanner ?? null;
   }
 }
 

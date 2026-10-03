@@ -6,7 +6,15 @@ export const SPRITE_COLUMNS = 6;
 export const SPRITE_ROWS = 5;
 export const SPRITE_WALK_FRAME_RATE = 8;
 
-const CHARACTER_HEIGHT_SUM_RATIO = 0.04;
+/**
+ * 角色高度 = 地图高度 × 该比例。
+ *
+ * 旧公式是 (mapWidth + mapHeight) * 0.04，在标准地图 2752×1536 上等于 171.5px。
+ * 但横向拼接扩展的地图（例如三倍宽 8256×1536）会让这个公式把角色放大 2.3 倍——
+ * 而底图的像素比例其实没变，角色应该保持原大小。
+ * 因此改为只依赖地图高度：标准地图下数值与旧公式完全一致，横向扩展时角色不再变形。
+ */
+const CHARACTER_HEIGHT_MAP_RATIO = (0.04 * (2752 + 1536)) / 1536; // ≈ 0.11167
 
 export interface CharacterDisplayMetrics {
   spriteWidth: number;
@@ -41,7 +49,8 @@ export function createCharacterDisplayMetrics(
   mapWidth: number,
   mapHeight: number,
 ): CharacterDisplayMetrics {
-  const spriteHeight = (mapWidth + mapHeight) * CHARACTER_HEIGHT_SUM_RATIO;
+  void mapWidth; // 角色尺寸只跟地图高度走（见 CHARACTER_HEIGHT_MAP_RATIO 的说明）
+  const spriteHeight = mapHeight * CHARACTER_HEIGHT_MAP_RATIO;
   const spriteWidth = spriteHeight * (SPRITE_FRAME_WIDTH / SPRITE_FRAME_HEIGHT);
 
   return {
@@ -59,9 +68,11 @@ export function createCharacterDisplayMetrics(
     shadowHeight: Math.max(2, spriteWidth * 0.125),
     shadowOffsetY: Math.max(2, spriteWidth * 0.1),
     bubbleOffsetY: -spriteHeight * 1.12,
-    bubbleFontSize: Math.max(16, spriteHeight * 0.17),
+    // 对话气泡字号：中文是满格方块字，同样磅值比拉丁字母显大，
+    // 因此按 0.12 比例（标准地图 ≈20.6 世界单位）而不是原来的 0.17（≈29.2）。
+    bubbleFontSize: Math.max(13, spriteHeight * 0.12),
     bubbleWrapWidth: Math.max(spriteWidth * 1.65, spriteHeight * 2.1),
-    bubblePadding: Math.max(8, spriteHeight * 0.06),
+    bubblePadding: Math.max(7, spriteHeight * 0.05),
     bubbleTailHeight: Math.max(4, spriteHeight * 0.035),
     bubbleCornerRadius: Math.max(6, spriteHeight * 0.045),
     labelNameWorldSize: spriteWidth * 0.20,

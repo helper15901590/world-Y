@@ -6,9 +6,15 @@ import {
   getSimulationBusyMessage,
   isSimulationBusy,
 } from "../../services/simulation-activity.js";
+import { requireAdmin } from "../../services/admin-auth.js";
 import { findWorldById } from "../../utils/world-directories.js";
 
 const router = Router();
+
+/** 取单值路由参数（Express 5 的 params 类型可能是 string | string[]） */
+function param(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
 
 function rejectIfSimulationBusy(res: Response): boolean {
   if (!isSimulationBusy()) return false;
@@ -63,7 +69,7 @@ router.get("/current", (_req, res) => {
 });
 
 // POST /timelines — create new timeline
-router.post("/", (_req, res) => {
+router.post("/", requireAdmin, (_req, res) => {
   const worldDir = appContext.getWorldDir();
   if (!worldDir) {
     res.status(503).json({ error: "No world loaded" });
@@ -83,14 +89,14 @@ router.post("/", (_req, res) => {
 });
 
 // POST /timelines/:id/load — switch to this timeline
-router.post("/:id/load", (req, res) => {
+router.post("/:id/load", requireAdmin, (req, res) => {
   const worldDir = appContext.getWorldDir();
   if (!worldDir) {
     res.status(503).json({ error: "No world loaded" });
     return;
   }
 
-  const timelineId = req.params.id;
+  const timelineId = param(req.params.id);
   const timelines = appContext.timelineManager.listTimelines(worldDir);
   if (!timelines.find((t) => t.id === timelineId)) {
     res.status(404).json({ error: "Timeline not found" });
@@ -107,14 +113,14 @@ router.post("/:id/load", (req, res) => {
 });
 
 // DELETE /timelines/:id — delete a timeline from current world
-router.delete("/:id", (req, res) => {
+router.delete("/:id", requireAdmin, (req, res) => {
   const worldDir = appContext.getWorldDir();
   if (!worldDir) {
     res.status(503).json({ error: "No world loaded" });
     return;
   }
 
-  const timelineId = req.params.id;
+  const timelineId = param(req.params.id);
   if (timelineId === appContext.timelineManager.getCurrentTimelineId()) {
     res.status(409).json({ error: "Cannot delete the currently active timeline." });
     return;
@@ -136,7 +142,7 @@ router.get("/:id/events", (req, res) => {
     return;
   }
 
-  const timelineId = req.params.id;
+  const timelineId = param(req.params.id);
   try {
     const frames = appContext.timelineManager.readTimelineEvents(worldDir, timelineId);
     res.json({ frames });
@@ -146,8 +152,9 @@ router.get("/:id/events", (req, res) => {
 });
 
 // DELETE /timelines/world/:worldId/:timelineId — delete a timeline from any world
-router.delete("/world/:worldId/:timelineId", (req, res) => {
-  const { worldId, timelineId } = req.params;
+router.delete("/world/:worldId/:timelineId", requireAdmin, (req, res) => {
+  const worldId = param(req.params.worldId);
+  const timelineId = param(req.params.timelineId);
 
   if (!worldId || worldId.includes("..") || worldId.includes("/")) {
     res.status(400).json({ error: "Invalid world id" });

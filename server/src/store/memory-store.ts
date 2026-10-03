@@ -193,6 +193,14 @@ export function deleteMemory(id: string): void {
   getDb().prepare("DELETE FROM memories WHERE id = ?").run(id);
 }
 
+/** 删除某个角色的全部记忆（删除角色时清理当前时间线的数据）。返回删除条数。 */
+export function deleteMemoriesByCharacter(characterId: string): number {
+  const result = getDb()
+    .prepare("DELETE FROM memories WHERE character_id = ?")
+    .run(characterId);
+  return Number(result.changes);
+}
+
 export function countMemoriesByTag(charId: string, tag: string): number {
   const memories = getMemoriesByCharacter(charId);
   return memories.filter((m) => m.tags.includes(tag)).length;

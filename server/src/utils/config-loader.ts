@@ -22,6 +22,271 @@ export function getWorldDir(): string | null {
   return worldDir;
 }
 
+/**
+ * 把运行期的角色修改写回世界目录里的角色配置文件（持久化）。
+ *
+ * - 采用"合并写入"：只覆盖被修改的字段，保留文件里原有的其它键
+ *   （如 startPosition 的原始形态、traits 等生成期信息）。
+ * - 先写临时文件再 rename，避免中断导致原文件损坏。
+ * - 找不到世界目录或该角色的配置文件时返回 false（不抛错，调用方决定如何提示）。
+ */
+export function persistCharacterProfilePatch(
+  charId: string,
+  patch: Record<string, unknown>,
+): boolean {
+  if (!worldDir) return false;
+
+  const candidates = [
+    path.join(worldDir, "config", "characters"),
+    path.join(worldDir, "characters"),
+  ];
+
+  for (const dir of candidates) {
+    const filePath = path.join(dir, `${charId}.json`);
+    if (!fs.existsSync(filePath)) continue;
+
+    try {
+      const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
+      const merged = { ...raw, ...patch };
+      // coreQuestActive 已废弃（任务是否启动只看 coreQuest 文本），顺手清掉历史遗留键
+      if ("coreQuest" in patch) {
+        delete merged.coreQuestActive;
+      }
+      const tmpPath = `${filePath}.tmp`;
+      fs.writeFileSync(tmpPath, `${JSON.stringify(merged, null, 2)}\n`, "utf-8");
+      fs.renameSync(tmpPath, filePath);
+      return true;
+    } catch (err) {
+      console.warn(`[WorldX] 角色 ${charId} 的人设写回配置文件失败:`, err);
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 新建角色的配置文件（管理面板「创建角色」）。已存在同名文件时返回 false，避免覆盖。
+ */
+export function createCharacterConfigFile(
+  charId: string,
+  data: Record<string, unknown>,
+): boolean {
+  if (!worldDir) return false;
+
+  try {
+    const dir = path.join(worldDir, "config", "characters");
+    fs.mkdirSync(dir, { recursive: true });
+    const filePath = path.join(dir, `${charId}.json`);
+    if (fs.existsSync(filePath)) return false;
+    fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
+    return true;
+  } catch (err) {
+    console.warn(`[WorldX] 角色 ${charId} 的配置文件创建失败:`, err);
+    return false;
+  }
+}
+
+/**
+ * 新角色的美术资源登记：
+ * - 可选：复制某个现有角色的精灵图（创建角色时"沿用现有形象"，省去生图模型）
+ * - 追加到 characters/characters.json 清单（与生成管线保持一致）
+ */
+export function registerNewCharacterAssets(params: {
+  id: string;
+  name: string;
+  description?: string;
+  spriteSourceId?: string;
+}): { spriteCopied: boolean; manifestUpdated: boolean } {
+  const result = { spriteCopied: false, manifestUpdated: false };
+  if (!worldDir) return result;
+
+  const charactersDir = path.join(worldDir, "characters");
+
+  if (params.spriteSourceId) {
+    try {
+      const srcSheet = path.join(charactersDir, params.spriteSourceId, "spritesheet.png");
+      if (fs.existsSync(srcSheet)) {
+        const dstDir = path.join(charactersDir, params.id);
+        fs.mkdirSync(dstDir, { recursive: true });
+        fs.copyFileSync(srcSheet, path.join(dstDir, "spritesheet.png"));
+
+        const srcMetaPath = path.join(charactersDir, params.spriteSourceId, "metadata.json");
+        if (fs.existsSync(srcMetaPath)) {
+          const meta = JSON.parse(fs.readFileSync(srcMetaPath, "utf-8")) as Record<string, unknown>;
+          fs.writeFileSync(
+            path.join(dstDir, "metadata.json"),
+            `${JSON.stringify(
+              { ...meta, id: params.id, name: params.name, description: params.description ?? meta.description },
+              null,
+              2,
+            )}\n`,
+            "utf-8",
+          );
+        }
+        result.spriteCopied = true;
+      }
+    } catch (err) {
+      console.warn(`[WorldX] 复制精灵资源失败（${params.spriteSourceId} → ${params.id}）:`, err);
+    }
+  }
+
+  try {
+    const manifestPath = path.join(charactersDir, "characters.json");
+    if (fs.existsSync(manifestPath)) {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+      if (Array.isArray(manifest) && !manifest.some((c: any) => c?.id === params.id)) {
+        manifest.push({
+          id: params.id,
+          name: params.name,
+          description: params.description ?? "",
+          createdAt: new Date().toISOString(),
+        });
+        fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
+        result.manifestUpdated = true;
+      }
+    }
+  } catch (err) {
+    console.warn(`[WorldX] 更新角色清单失败（${params.id}）:`, err);
+  }
+
+  return result;
+}
+
+/** 角色 id 的合法形态（用于校验，同时防止路径穿越） */
+export const CHARACTER_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * 把「环境物品」的修改写回 world.json 的 locations 数组（嵌套合并写入）。
+ * 传 objectId 时修改该地点下的物件，否则修改地点本身。
+ */
+export function persistEnvironmentPatch(params: {
+  locationId: string;
+  objectId?: string;
+  patch: Record<string, unknown>;
+}): boolean {
+  if (!worldDir) return false;
+
+  const candidates = [
+    path.join(worldDir, "config", "world.json"),
+    path.join(worldDir, "world.json"),
+  ];
+
+  for (const filePath of candidates) {
+    if (!fs.existsSync(filePath)) continue;
+
+    try {
+      const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
+      const locations = Array.isArray(raw.locations) ? (raw.locations as any[]) : null;
+      if (!locations) return false;
+
+      const location = locations.find((l) => l?.id === params.locationId);
+      if (!location) return false;
+
+      if (params.objectId) {
+        const objects = Array.isArray(location.objects) ? (location.objects as any[]) : null;
+        const object = objects?.find((o) => o?.id === params.objectId);
+        if (!object) return false;
+        Object.assign(object, params.patch);
+      } else {
+        Object.assign(location, params.patch);
+      }
+
+      const tmpPath = `${filePath}.tmp`;
+      fs.writeFileSync(tmpPath, `${JSON.stringify(raw, null, 2)}\n`, "utf-8");
+      fs.renameSync(tmpPath, filePath);
+      return true;
+    } catch (err) {
+      console.warn("[WorldX] 环境/物件配置写回失败:", err);
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 删除角色在世界目录里的文件：配置文件、立绘目录、characters.json 清单条目。
+ * 用于管理面板「删除角色」。
+ */
+export function deleteCharacterFiles(charId: string): {
+  configRemoved: boolean;
+  assetsRemoved: boolean;
+  manifestUpdated: boolean;
+} {
+  const result = { configRemoved: false, assetsRemoved: false, manifestUpdated: false };
+  if (!worldDir || !CHARACTER_ID_PATTERN.test(charId)) return result;
+
+  const configPath = path.join(worldDir, "config", "characters", `${charId}.json`);
+  if (fs.existsSync(configPath)) {
+    try {
+      fs.rmSync(configPath, { force: true });
+      result.configRemoved = true;
+    } catch (err) {
+      console.warn(`[WorldX] 删除角色配置失败（${charId}）:`, err);
+    }
+  }
+
+  const assetDir = path.join(worldDir, "characters", charId);
+  if (fs.existsSync(assetDir)) {
+    try {
+      fs.rmSync(assetDir, { recursive: true, force: true });
+      result.assetsRemoved = true;
+    } catch (err) {
+      console.warn(`[WorldX] 删除角色立绘失败（${charId}）:`, err);
+    }
+  }
+
+  try {
+    const manifestPath = path.join(worldDir, "characters", "characters.json");
+    if (fs.existsSync(manifestPath)) {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+      if (Array.isArray(manifest)) {
+        const next = manifest.filter((c: any) => c?.id !== charId);
+        if (next.length !== manifest.length) {
+          fs.writeFileSync(manifestPath, `${JSON.stringify(next, null, 2)}\n`, "utf-8");
+          result.manifestUpdated = true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[WorldX] 更新角色清单失败（${charId}）:`, err);
+  }
+
+  return result;
+}
+
+/**
+ * 把运行期修改的世界设定写回世界目录里的 world.json（合并写入，保留其余键）。
+ * 用于管理面板的「世界设定」编辑。返回是否成功写入。
+ */
+export function persistWorldConfigPatch(patch: Record<string, unknown>): boolean {
+  if (!worldDir) return false;
+
+  const candidates = [
+    path.join(worldDir, "config", "world.json"),
+    path.join(worldDir, "world.json"),
+  ];
+
+  for (const filePath of candidates) {
+    if (!fs.existsSync(filePath)) continue;
+
+    try {
+      const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
+      const merged = { ...raw, ...patch };
+      const tmpPath = `${filePath}.tmp`;
+      fs.writeFileSync(tmpPath, `${JSON.stringify(merged, null, 2)}\n`, "utf-8");
+      fs.renameSync(tmpPath, filePath);
+      return true;
+    } catch (err) {
+      console.warn("[WorldX] 世界设定写回配置文件失败:", err);
+      return false;
+    }
+  }
+
+  return false;
+}
+
 export function loadWorldConfig(): WorldConfig {
   if (cachedWorldConfig) return cachedWorldConfig;
 
@@ -119,7 +384,7 @@ export function reloadConfigs(): void {
   cachedPromptTemplates.clear();
 }
 
-function normalizeCharacterProfile(raw: any): CharacterProfile | null {
+export function normalizeCharacterProfile(raw: any): CharacterProfile | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw) || !raw.id || !raw.name) {
     return null;
   }
@@ -140,6 +405,12 @@ function normalizeCharacterProfile(raw: any): CharacterProfile | null {
       typeof raw.appearanceHint === "string" && raw.appearanceHint.trim()
         ? raw.appearanceHint.trim()
         : undefined,
+    gender: optionalText(raw.gender),
+    age: optionalText(raw.age),
+    department: optionalText(raw.department),
+    position: optionalText(raw.position),
+    jobTitle: optionalText(raw.jobTitle),
+    dislikes: toStringArray(raw.dislikes),
     coreMotivation: raw.coreMotivation || raw.motivation || raw.role || "在这个世界中过好自己的生活",
     coreValues: Array.isArray(raw.coreValues) ? raw.coreValues : [],
     speakingStyle:
@@ -151,16 +422,21 @@ function normalizeCharacterProfile(raw: any): CharacterProfile | null {
     preferredLocations: Array.isArray(raw.preferredLocations)
       ? raw.preferredLocations
       : [startLocation],
-    preferredActivities: Array.isArray(raw.preferredActivities) ? raw.preferredActivities : [],
+    preferredActivities: toStringArray(raw.preferredActivities ?? raw.hobbies),
     socialStyle,
     extraversionLevel,
     intuitionLevel,
-    skills: Array.isArray(raw.skills) ? raw.skills : [],
+    skills: toStringArray(raw.skills ?? raw.coreAbilities),
     writeDiary: raw.writeDiary ?? true,
     fourthWallCandidate: raw.fourthWallCandidate ?? false,
     tags: Array.isArray(raw.tags) ? raw.tags : [],
     initialMemories: normalizeInitialMemories(raw.initialMemories, startLocation),
     anchor: normalizeAnchor(raw.anchor),
+    coreQuest: optionalText(raw.coreQuest),
+    editPassword:
+      typeof raw.editPassword === "string" && raw.editPassword.trim()
+        ? raw.editPassword.trim()
+        : undefined,
     iconicCues: normalizeIconicCues(raw.iconicCues),
     canonicalRefs: normalizeCanonicalRefs(raw.canonicalRefs),
   };
@@ -210,6 +486,16 @@ function toStringArray(value: unknown): string[] {
   return value
     .map((v) => (typeof v === "string" ? v.trim() : ""))
     .filter((v) => v.length > 0);
+}
+
+/** 选填文本字段：接受字符串或数字（如 age），去空白后为空则视为未填写。 */
+function optionalText(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function normalizeStartLocation(startPosition: unknown): string {

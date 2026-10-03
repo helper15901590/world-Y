@@ -10,6 +10,7 @@ import type {
 import { buildCharacterNameMap } from "../utils/event-format";
 import { DialogueChatView, type TimedTurn } from "./DialogueChatView";
 import { useDialogueStyle, toggleDialogueStyle } from "../hooks/useDialogueStyle";
+import { EventBus } from "../../EventBus";
 
 interface DialogueSession {
   conversationId: string;
@@ -51,7 +52,15 @@ export function DialoguePanel({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    apiClient.getCharacters().then(setCharacters).catch(console.warn);
+    const refresh = () => {
+      apiClient.getCharacters().then(setCharacters).catch(console.warn);
+    };
+    refresh();
+    // 「改人设」改名后立即刷新，避免面板里还显示旧名字
+    EventBus.instance.on("characters_changed", refresh);
+    return () => {
+      EventBus.instance.off("characters_changed", refresh);
+    };
   }, []);
 
   const sessions = useMemo(() => {

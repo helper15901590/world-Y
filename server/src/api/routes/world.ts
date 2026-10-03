@@ -16,6 +16,8 @@ import {
   listLibraryWorlds,
   findWorldById,
 } from "../../utils/world-directories.js";
+import { persistWorldConfigPatch, persistEnvironmentPatch } from "../../utils/config-loader.js";
+import { requireAdmin } from "../../services/admin-auth.js";
 
 const router = Router();
 
@@ -35,6 +37,242 @@ router.get("/time", (_req, res) => {
     return;
   }
   res.json(buildWorldTimeInfo(appContext.worldManager.getCurrentTime()));
+});
+
+/**
+ * GET /api/world/prompt — 读取"发给大模型"的世界设定（管理面板「世界设定」用）。
+ * worldSocialContext 返回的是**实际生效**的文本（已应用"留空回退到世界简介"规则）。
+ */
+router.get("/prompt", requireAdmin, (_req, res) => {
+  if (!appContext.hasWorld) {
+    res.status(503).json({ error: "No world loaded" });
+    return;
+  }
+  const wm = appContext.worldManager;
+  res.json({
+    worldName: wm.getWorldName(),
+    worldDescription: wm.getWorldDescription(),
+    worldSocialContext: wm.getWorldSocialContext(),
+  });
+});
+
+/**
+ * PATCH /api/world/prompt — 修改世界设定，立即生效（下一次 LLM 调用即使用新内容），
+ * 并写回世界目录的 world.json；worldSocialContext 留空时回退到「世界简介」。
+ */
+router.patch("/prompt", requireAdmin, (req, res) => {
+  if (!appContext.hasWorld) {
+    res.status(503).json({ error: "No world loaded" });
+    return;
+  }
+
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const patch: {
+    worldName?: string;
+    worldDescription?: string;
+    worldSocialContext?: string;
+  } = {};
+
+  for (const key of ["worldName", "worldDescription", "worldSocialContext"] as const) {
+    if (!(key in body)) continue;
+    if (typeof body[key] !== "string") {
+      res.status(400).json({ error: `${key} must be a string` });
+      return;
+    }
+    patch[key] = body[key] as string;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    res.status(400).json({ error: "nothing to update" });
+    return;
+  }
+
+  const wm = appContext.worldManager;
+  wm.updateWorldPrompt(patch);
+
+  // 写回配置文件：只写用户实际提交的键，社交背景写"原文"（保留留空回退语义）
+  const filePatch: Record<string, unknown> = {};
+  if (patch.worldName !== undefined) filePatch.worldName = wm.getWorldName();
+  if (patch.worldDescription !== undefined) filePatch.worldDescription = wm.getWorldDescription();
+  if (patch.worldSocialContext !== undefined) filePatch.worldSocialContext = patch.worldSocialContext.trim();
+
+  const persisted = persistWorldConfigPatch(filePatch);
+
+  res.json({
+    ok: true,
+    persisted,
+    worldName: wm.getWorldName(),
+    worldDescription: wm.getWorldDescription(),
+    worldSocialContext: wm.getWorldSocialContext(),
+  });
+});
+
+function toEnvironmentObjectInfo(obj: {
+  id: string;
+  name: string;
+  state: string;
+  stateDescription: string;
+  capacity: number;
+  currentUsers: string[];
+}) {
+  return {
+    id: obj.id,
+    name: obj.name,
+    state: obj.state,
+    stateDescription: obj.stateDescription,
+    capacity: obj.capacity,
+    currentUsers: obj.currentUsers,
+  };
+}
+
+/**
+ * GET /api/world/environment — 环境与物品一览（地点 + 可交互物件，含运行时状态）
+ */
+router.get("/environment", (_req, res) => {
+  if (!appContext.hasWorld) {
+    res.status(503).json({ error: "No world loaded" });
+    return;
+  }
+  const wm = appContext.worldManager;
+  res.json({
+    locations: wm.getAllLocations().map((loc) => ({
+      id: loc.id,
+      name: loc.name,
+      description: loc.description,
+      objects: wm.getLocationObjects(loc.id).map(toEnvironmentObjectInfo),
+    })),
+  });
+});
+
+/**
+ * PATCH /api/world/environment/location/:id — 修改地点名称/描述
+ * 立即生效（角色感知随之变化）并写回 world.json。
+ */
+router.patch("/environment/location/:id", requireAdmin, (req, res) => {
+  if (!appContext.hasWorld) {
+    res.status(503).json({ error: "No world loaded" });
+    return;
+  }
+  const locationId = String(req.params.id);
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const wm = appContext.worldManager;
+
+  if (!wm.getAllLocations().some((l) => l.id === locationId)) {
+    res.status(404).json({ error: "location not found" });
+    return;
+  }
+
+  const patch: { name?: string; description?: string } = {};
+  if ("name" in body) {
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      res.status(400).json({ error: "name must be a non-empty string" });
+      return;
+    }
+    patch.name = body.name.trim();
+  }
+  if ("description" in body) {
+    if (typeof body.description !== "string") {
+      res.status(400).json({ error: "description must be a string" });
+      return;
+    }
+    patch.description = body.description.trim();
+  }
+  if (Object.keys(patch).length === 0) {
+    res.status(400).json({ error: "nothing to update" });
+    return;
+  }
+
+  wm.updateLocationMeta(locationId, patch);
+  const persisted = persistEnvironmentPatch({
+    locationId,
+    patch: patch as Record<string, unknown>,
+  });
+  const updated = wm.getAllLocations().find((l) => l.id === locationId);
+  res.json({
+    ok: true,
+    persisted,
+    location: {
+      id: locationId,
+      name: updated?.name ?? "",
+      description: updated?.description ?? "",
+    },
+  });
+});
+
+/**
+ * PATCH /api/world/environment/object/:id — 修改物件
+ * - name：静态配置，写回 world.json
+ * - state / stateDescription：运行时状态（当前时间线），立即影响角色感知
+ */
+router.patch("/environment/object/:id", requireAdmin, (req, res) => {
+  if (!appContext.hasWorld) {
+    res.status(503).json({ error: "No world loaded" });
+    return;
+  }
+  const objectId = String(req.params.id);
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const wm = appContext.worldManager;
+
+  const location = wm.getAllLocations().find((l) => l.objects.some((o) => o.id === objectId));
+  if (!location) {
+    res.status(404).json({ error: "object not found" });
+    return;
+  }
+
+  const staticPatch: { name?: string } = {};
+  if ("name" in body) {
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      res.status(400).json({ error: "name must be a non-empty string" });
+      return;
+    }
+    staticPatch.name = body.name.trim();
+  }
+
+  const runtimeState = "state" in body ? body.state : undefined;
+  const runtimeDesc = "stateDescription" in body ? body.stateDescription : undefined;
+  if (runtimeState !== undefined && (typeof runtimeState !== "string" || !runtimeState.trim())) {
+    res.status(400).json({ error: "state must be a non-empty string" });
+    return;
+  }
+  if (runtimeDesc !== undefined && typeof runtimeDesc !== "string") {
+    res.status(400).json({ error: "stateDescription must be a string" });
+    return;
+  }
+
+  if (
+    Object.keys(staticPatch).length === 0 &&
+    runtimeState === undefined &&
+    runtimeDesc === undefined
+  ) {
+    res.status(400).json({ error: "nothing to update" });
+    return;
+  }
+
+  let persisted = false;
+  if (Object.keys(staticPatch).length > 0) {
+    wm.updateObjectMeta(objectId, staticPatch);
+    persisted = persistEnvironmentPatch({
+      locationId: location.id,
+      objectId,
+      patch: staticPatch as Record<string, unknown>,
+    });
+  }
+
+  if (runtimeState !== undefined || runtimeDesc !== undefined) {
+    const current = wm.getLocationObjects(location.id).find((o) => o.id === objectId);
+    wm.updateObjectState(
+      objectId,
+      typeof runtimeState === "string" ? runtimeState.trim() : current?.state ?? "available",
+      typeof runtimeDesc === "string" ? runtimeDesc.trim() : undefined,
+    );
+  }
+
+  const refreshed = wm.getLocationObjects(location.id).find((o) => o.id === objectId);
+  res.json({
+    ok: true,
+    persisted,
+    object: refreshed ? toEnvironmentObjectInfo(refreshed) : null,
+  });
 });
 
 router.get("/info", (_req, res) => {
@@ -60,7 +298,7 @@ router.get("/info", (_req, res) => {
   });
 });
 
-router.post("/dev/tick-duration", (req, res) => {
+router.post("/dev/tick-duration", requireAdmin, (req, res) => {
   if (!appContext.hasWorld) {
     res.status(503).json({ error: "No world loaded" });
     return;

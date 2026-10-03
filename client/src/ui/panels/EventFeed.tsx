@@ -7,14 +7,23 @@ import {
   formatEventSummary,
   formatEventType,
 } from "../utils/event-format";
+import { EventBus } from "../../EventBus";
 
 export function EventFeed({ events }: { events: SimulationEvent[] }) {
   const [characters, setCharacters] = useState<CharacterInfo[]>([]);
   const [locations, setLocations] = useState<LocationInfo[]>([]);
 
   useEffect(() => {
-    apiClient.getCharacters().then(setCharacters).catch(console.warn);
+    const refresh = () => {
+      apiClient.getCharacters().then(setCharacters).catch(console.warn);
+    };
+    refresh();
+    // 「改人设」改名后立即刷新，避免事件流里还显示旧名字
+    EventBus.instance.on("characters_changed", refresh);
     apiClient.getLocations().then(setLocations).catch(console.warn);
+    return () => {
+      EventBus.instance.off("characters_changed", refresh);
+    };
   }, []);
 
   const characterNames = useMemo(() => buildCharacterNameMap(characters), [characters]);

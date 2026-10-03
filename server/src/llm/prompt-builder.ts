@@ -1,4 +1,5 @@
 import { loadPromptTemplate } from "../utils/config-loader.js";
+import { getCoreQuest } from "../core/quest-focus.js";
 import {
   tickToSceneTimeWithPeriod,
   getSceneEndingHint,
@@ -25,6 +26,7 @@ const TEMPLATE_NAMES = [
   "micro-reflection",
   "reflection",
   "sandbox-chat",
+  "quest-plan",
 ];
 
 let initialized = false;
@@ -66,6 +68,7 @@ export class PromptBuilder {
     actionMenu: string;
     currentFocus?: string;
     worldSocialContext?: string;
+    questPlan?: string[];
   }): Message[] {
     const { profile, state, gameTime, perception } = params;
 
@@ -81,8 +84,6 @@ export class PromptBuilder {
 
     const content = this.build("reactive-decision", {
       name: profile.name,
-      role: profile.role,
-      speakingStyle: profile.speakingStyle,
       day: String(gameTime.day),
       timeString,
       sceneEndingHint,
@@ -94,6 +95,45 @@ export class PromptBuilder {
       relevantMemories: params.relevantMemories || "（无相关记忆）",
       actionMenu: params.actionMenu,
       iconicCuesBlock: formatIconicCuesBlock(profile),
+      personaBlock: formatPersonaBlock(profile) || "（无）",
+      questBlock: formatQuestBlock(profile) || "（当前没有特别的任务）",
+      planBlock: formatPlanBlock(params.questPlan) || "（还没有明确的步骤——先想一个大概方向，动手做第一步。）",
+    });
+
+    return [{ role: "user", content }];
+  }
+
+  buildQuestPlanMessages(params: {
+    profile: CharacterProfile;
+    gameTime: GameTime;
+    currentLocation: string;
+    worldKnowledge: string;
+    previousSteps?: string[];
+  }): Message[] {
+    const { profile, gameTime } = params;
+
+    const quest = getCoreQuest(profile);
+    const previousSteps = (params.previousSteps ?? []).filter(
+      (s) => typeof s === "string" && s.trim().length > 0,
+    );
+    const previousPlanBlock =
+      quest && previousSteps.length > 0
+        ? [
+            "",
+            "## 你之前的计划（可以沿用、合并或重排）",
+            ...previousSteps.map((step, i) => `${i + 1}. ${step.trim()}`),
+          ].join("\n")
+        : "";
+
+    const content = this.build("quest-plan", {
+      name: profile.name,
+      personaBlock: formatPersonaBlock(profile) || "（无）",
+      questText: quest || "（没有明确任务）",
+      worldKnowledge: params.worldKnowledge || "（陌生的小世界）",
+      previousPlanBlock,
+      day: String(gameTime.day),
+      timeString: tickToSceneTimeWithPeriod(gameTime.tick),
+      currentLocation: params.currentLocation,
     });
 
     return [{ role: "user", content }];
@@ -120,8 +160,8 @@ export class PromptBuilder {
 
     const content = this.build("dialogue", {
       nameA: a.profile.name,
-      roleA: a.profile.role,
-      styleA: a.profile.speakingStyle,
+      personaA: formatPersonaInline(a.profile) || "（无）",
+      questA: formatQuestInline(a.profile) || "（无）",
       emotionA: getEmotionLabelSimple(
         a.state.emotionValence,
         a.state.emotionArousal,
@@ -130,8 +170,8 @@ export class PromptBuilder {
       motivation: params.initiatorMotivation,
 
       nameB: b.profile.name,
-      roleB: b.profile.role,
-      styleB: b.profile.speakingStyle,
+      personaB: formatPersonaInline(b.profile) || "（无）",
+      questB: formatQuestInline(b.profile) || "（无）",
       emotionB: getEmotionLabelSimple(
         b.state.emotionValence,
         b.state.emotionArousal,
@@ -179,8 +219,8 @@ export class PromptBuilder {
     const content = this.build("dialogue-turn", {
       nameA: a.profile.name,
       idA: a.profile.id,
-      roleA: a.profile.role,
-      styleA: a.profile.speakingStyle,
+      personaA: formatPersonaInline(a.profile) || "（无）",
+      questA: formatQuestInline(a.profile) || "（无）",
       emotionA: getEmotionLabelSimple(
         a.state.emotionValence,
         a.state.emotionArousal,
@@ -191,8 +231,8 @@ export class PromptBuilder {
 
       nameB: b.profile.name,
       idB: b.profile.id,
-      roleB: b.profile.role,
-      styleB: b.profile.speakingStyle,
+      personaB: formatPersonaInline(b.profile) || "（无）",
+      questB: formatQuestInline(b.profile) || "（无）",
       emotionB: getEmotionLabelSimple(
         b.state.emotionValence,
         b.state.emotionArousal,
@@ -263,8 +303,6 @@ export class PromptBuilder {
 
     const content = this.build("diary", {
       name: profile.name,
-      role: profile.role,
-      speakingStyle: profile.speakingStyle,
       day: String(gameDay),
       todayMemories: params.todayMemories || "（今天没什么特别的事）",
     });
@@ -318,12 +356,11 @@ export class PromptBuilder {
 
     const content = this.build("sandbox-chat", {
       name: profile.name,
-      role: profile.role,
-      speakingStyle: profile.speakingStyle,
-      coreMotivation: profile.coreMotivation,
       emotionLabel,
       memoriesBlock: params.memoriesBlock || "（没什么特别相关的记忆浮上来）",
       iconicCuesBlock: formatIconicCuesBlock(profile),
+      personaBlock: formatPersonaBlock(profile) || "（无）",
+      questBlock: formatQuestBlock(profile, "chat") || "（当前没有特别的任务）",
       userIdentityBlock,
       transcript: transcriptText,
       latestUserMessage: params.latestUserMessage,
@@ -343,7 +380,6 @@ export class PromptBuilder {
 
     const content = this.build("micro-reflection", {
       name: profile.name,
-      role: profile.role,
       day: String(gameDay),
       timeString: params.timeString || "此刻",
       currentFocus: params.currentFocus || "（此刻没有特别明确的牵挂）",
@@ -362,7 +398,6 @@ export class PromptBuilder {
 
     const content = this.build("reflection", {
       name: profile.name,
-      role: profile.role,
       day: String(gameDay),
       recentMemories: params.recentMemories || "（今天没什么特别的事）",
     });
@@ -473,7 +508,6 @@ function formatIconicCuesBlockForPair(
 function buildIconicCuesText(profile: CharacterProfile): string {
   const lines: string[] = [];
   const cues = profile.iconicCues;
-  const refs = profile.canonicalRefs;
 
   if (cues) {
     if (cues.speechQuirks && cues.speechQuirks.length > 0) {
@@ -482,26 +516,116 @@ function buildIconicCuesText(profile: CharacterProfile): string {
     if (cues.catchphrases && cues.catchphrases.length > 0) {
       lines.push(`- 口头禅（最多 2 个，不要每次都说）：${cues.catchphrases.join(" / ")}`);
     }
-    if (cues.behavioralTics && cues.behavioralTics.length > 0) {
-      lines.push(`- 小动作：${cues.behavioralTics.join("；")}`);
-    }
-  }
-
-  if (refs) {
-    if (refs.source) {
-      lines.push(`- 原型来源：${refs.source}`);
-    }
-    if (refs.keyRelationships && refs.keyRelationships.length > 0) {
-      lines.push(`- 过去真正在意的人：${refs.keyRelationships.join("；")}`);
-    }
-    if (refs.signatureMoments && refs.signatureMoments.length > 0) {
-      lines.push(
-        `- 标志性经历（藏起来的"软肋/执念"，别主动炫耀，只在情境触发时才轻轻流露）：${refs.signatureMoments.join("；")}`,
-      );
-    }
   }
 
   return lines.join("\n");
+}
+
+/**
+ * 核心任务块：仅当 coreQuest 有文字时注入——填写即启动，清空即停止，没有单独的开关。
+ * 措辞兼顾"强引导"（尤其影响移动方向）与"不变成任务机器"。
+ */
+function formatQuestBlock(
+  profile: CharacterProfile,
+  kind: "decision" | "chat" = "decision",
+): string {
+  const quest = getCoreQuest(profile);
+  if (!quest) return "";
+  if (kind === "chat") {
+    return [
+      `- 你当前最上心的任务：${quest}`,
+      "",
+      "（这是你此刻的首要目标：聊天时只要不突兀，就自然地把话题往这个方向带，或说起相关的打算；",
+      "但不要逢人就复述任务原文，也不要为了它做出违背你性格的事。）",
+    ].join("\n");
+  }
+  return [
+    `- 你当前最上心的任务：${quest}`,
+    "",
+    "（这是你此刻的**首要目标**，优先于日常活动——它决定你接下来做什么、往哪走：",
+    "  · 行动：优先选能推进它的动作——去相关的地方、找相关的人、接触相关的物件；行动菜单里带 ★ 的选项与它直接相关，优先考虑。",
+    "  · 移动：如果相关地点不在眼前，就一步一步往那个方向走，别因为怕麻烦停在原地；",
+    "  · 说话：只要不突兀就往这个方向打听或试探；有人问你在做什么、有什么打算时，可以自然地说起这件事。",
+    "  · 边界：任务暂时无从推进时，才回到日常活动；不要逢人就复述任务原文，也不要为了任务做出违背你性格的事。）",
+  ].join("\n");
+}
+
+/** 单行核心任务，用于对话模板里的角色条目行（避免多行破坏列表结构）。 */
+function formatQuestInline(profile: CharacterProfile): string {
+  const quest = getCoreQuest(profile);
+  if (!quest) return "";
+  return `最上心的任务：${quest}（优先推进它，但不要逢人就提，也不要为它违背性格）`;
+}
+
+/**
+ * 行动步骤块：角色自己规划的任务路线（由 QuestPlanner 生成、角色自己可修订）。
+ * 没有步骤时返回空串，由调用方给兜底文案。
+ */
+function formatPlanBlock(steps?: string[]): string {
+  const list = (steps ?? [])
+    .filter((s) => typeof s === "string" && s.trim().length > 0)
+    .map((s) => s.trim());
+  if (list.length === 0) return "";
+  return [
+    ...list.map((step, i) => `${i + 1}. ${step}`),
+    "",
+    "（这是你自己定的路线：按顺序推进，完成一步自然进入下一步；某一步走不通、或情况变了，就调整它——",
+    "需要改步骤时，在本次输出的 `questPlan` 里给出修订后的完整步骤列表；步骤没变就不要输出这个字段。）",
+  ].join("\n");
+}
+
+type PersonaEntry = { label: string; value: string };
+
+/**
+ * 收集角色「个人档案」字段（选填字段，未填写的自动跳过）。
+ * 这些字段只影响角色的行为底色，不参与引擎逻辑。
+ */
+function collectPersonaEntries(profile: CharacterProfile): PersonaEntry[] {
+  const entries: PersonaEntry[] = [];
+
+  const push = (label: string, value?: string | string[]) => {
+    if (Array.isArray(value)) {
+      const joined = value
+        .filter((v) => typeof v === "string" && v.trim().length > 0)
+        .map((v) => v.trim())
+        .join("、");
+      if (joined) entries.push({ label, value: joined });
+      return;
+    }
+    if (typeof value === "string" && value.trim().length > 0) {
+      entries.push({ label, value: value.trim() });
+    }
+  };
+
+  push("性别", profile.gender);
+  push("年龄", profile.age);
+  push("部门", profile.department);
+  push("岗位", profile.position);
+  push("职位", profile.jobTitle);
+  push("核心能力", profile.skills);
+  push("爱好", profile.preferredActivities);
+  push("核心价值观", profile.coreValues);
+  push("害怕", profile.fears);
+  push("厌恶", profile.dislikes);
+  push("背景", profile.backstory);
+  return entries;
+}
+
+/**
+ * 多行「个人档案」块，用于有独立小节的模板（决策 / 沙盒对话）。
+ * 无任何有效字段时返回空串，由调用方决定兜底文案。
+ */
+function formatPersonaBlock(profile: CharacterProfile): string {
+  return collectPersonaEntries(profile)
+    .map((entry) => `- ${entry.label}：${entry.value}`)
+    .join("\n");
+}
+
+/** 单行「个人档案」，用于对话模板里的角色条目行（避免多行破坏列表结构）。 */
+function formatPersonaInline(profile: CharacterProfile): string {
+  return collectPersonaEntries(profile)
+    .map((entry) => `${entry.label}：${entry.value}`)
+    .join("；");
 }
 
 export const promptBuilder = new PromptBuilder();

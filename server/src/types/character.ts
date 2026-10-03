@@ -17,6 +17,14 @@ export interface CharacterProfile {
   backstory?: string;
   appearanceHint?: string;
 
+  /** 以下为选填的个人档案字段，非空时会一并注入提示词（见 prompt-builder 的 formatPersonaBlock） */
+  gender?: string;
+  age?: string;
+  department?: string;
+  position?: string;
+  jobTitle?: string;
+  dislikes?: string[];
+
   coreMotivation: string;
   coreValues: string[];
   speakingStyle: string;
@@ -46,6 +54,18 @@ export interface CharacterProfile {
 
   /** 锚定：限制角色必须待在某个区域或可交互元素附近 */
   anchor?: CharacterAnchor;
+
+  /**
+   * 核心任务：填写即启动、清空即停止（没有单独的开关），会注入决策与对话提示词，
+   * 角色的行动、移动方向与话题会围绕它展开。
+   */
+  coreQuest?: string;
+
+  /**
+   * 编辑密码：非管理员修改这个角色的设定时必须在 PATCH 请求里带上它。
+   * 由服务端自动生成（12 位），管理员在上帝面板查看并分发给玩家。
+   */
+  editPassword?: string;
 
   /** 仅为知名 IP 角色而填，普通原创角色应为 undefined */
   iconicCues?: IconicCues;

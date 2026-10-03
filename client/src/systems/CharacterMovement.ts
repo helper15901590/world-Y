@@ -5,6 +5,11 @@ import { CharacterSprite } from "../objects/CharacterSprite";
 
 const LOCAL_WANDER_RADIUS_TILES = 4;
 const ANCHORED_ELEMENT_WANDER_RADIUS_TILES = 2;
+/** 任务相关物件对闲逛的吸引：命中概率与物件周围的可走半径 */
+const QUEST_OBJECT_WANDER_CHANCE = 0.7;
+const QUEST_OBJECT_WANDER_RADIUS_TILES = 3;
+/** 朝任务物件走可以比普通闲逛远：路径超过这个步数仍放弃 */
+const QUEST_OBJECT_MAX_PATH_STEPS = 30;
 const FADE_TRANSPORT_SCAN_TILES = 30;
 const FADE_TRANSPORT_WALK_RATIO = 2 / 3;
 const FADE_MS = 300;
@@ -39,18 +44,26 @@ export class CharacterMovement {
       sprite.stopMoving();
     }
 
-    const target = this.mapManager.getRandomWalkablePointInLocation(locationId, {
-      preferInset: this.mapManager.isPinnedLocation(locationId),
-    });
-    if (!target) return;
+    // 有核心任务时，目的地里若就有任务相关物件，优先落在物件附近（角色看起来是奔着它去的）
+    const questTarget = this.pickQuestObjectPoint(
+      sprite,
+      locationId,
+      this.mapManager.isPinnedLocation(locationId) ? locationId : undefined,
+    );
+    const arrival =
+      questTarget ??
+      this.mapManager.getRandomWalkablePointInLocation(locationId, {
+        preferInset: this.mapManager.isPinnedLocation(locationId),
+      });
+    if (!arrival) return;
 
-    const path = await this.pathfinder.findPath(sprite.x, sprite.y, target.x, target.y);
+    const path = await this.pathfinder.findPath(sprite.x, sprite.y, arrival.x, arrival.y);
     const onArrive = () => {
       sprite.currentLocationId = locationId;
       sprite.mainAreaPointId = null;
       sprite.setMovementAnchor({
-        x: target.x,
-        y: target.y,
+        x: arrival.x,
+        y: arrival.y,
         pinned: this.mapManager.isPinnedLocation(locationId),
       });
       this.ambientMoveCooldownUntil.set(charId, performance.now() + this.randomAmbientDelay());
@@ -58,7 +71,7 @@ export class CharacterMovement {
     if (path && path.length > 0) {
       await this.walkSprite(sprite, path, onArrive);
     } else {
-      await this.fadeTransport(sprite, target, onArrive);
+      await this.fadeTransport(sprite, arrival, onArrive);
     }
   }
 
@@ -125,16 +138,25 @@ export class CharacterMovement {
       ? ANCHORED_ELEMENT_WANDER_RADIUS_TILES
       : LOCAL_WANDER_RADIUS_TILES;
 
-    const target = this.mapManager.getRandomWalkablePointNear(
-      origin.x,
-      origin.y,
-      wanderRadius,
+    // 有核心任务时，先把闲逛目标偏向当前区域里的任务相关物件
+    const questTarget = this.pickQuestObjectPoint(
+      sprite,
+      currentLoc,
       pinned ? currentLoc : undefined,
     );
+    const target =
+      questTarget ??
+      this.mapManager.getRandomWalkablePointNear(
+        origin.x,
+        origin.y,
+        wanderRadius,
+        pinned ? currentLoc : undefined,
+      );
     if (!target) return;
 
+    const maxPathSteps = questTarget ? QUEST_OBJECT_MAX_PATH_STEPS : 15;
     const path = await this.pathfinder.findPath(sprite.x, sprite.y, target.x, target.y);
-    if (path && path.length > 0 && path.length < 15) {
+    if (path && path.length > 0 && path.length < maxPathSteps) {
       await this.walkSprite(sprite, path, () => {
         if (!useFixedAnchor) {
           sprite.setMovementAnchor({
@@ -146,6 +168,38 @@ export class CharacterMovement {
         this.ambientMoveCooldownUntil.set(charId, performance.now() + this.randomAmbientDelay());
       });
     }
+  }
+
+  /**
+   * 从角色的「任务相关物件」里挑一个就在 locationId 区域内的，
+   * 返回它附近的可走落脚点；没有命中（或掷骰未过）时返回 null。
+   * 锚定角色不参与，保持原有活动范围。
+   */
+  private pickQuestObjectPoint(
+    sprite: CharacterSprite,
+    locationId: string,
+    restrictLocationId?: string,
+  ): { x: number; y: number } | null {
+    if (sprite.questObjectIds.length === 0) return null;
+    if (sprite.profileAnchor) return null;
+    if (Math.random() > QUEST_OBJECT_WANDER_CHANCE) return null;
+
+    const shuffled = [...sprite.questObjectIds].sort(() => Math.random() - 0.5);
+    for (const objectId of shuffled) {
+      const anchor = this.mapManager.getObjectInteractionPosition(objectId);
+      if (!anchor) continue;
+      const objectLocation =
+        this.mapManager.getLocationAtPixel(anchor.x, anchor.y) ?? "main_area";
+      if (objectLocation !== locationId) continue;
+      const point = this.mapManager.getRandomWalkablePointNear(
+        anchor.x,
+        anchor.y,
+        QUEST_OBJECT_WANDER_RADIUS_TILES,
+        restrictLocationId,
+      );
+      if (point) return point;
+    }
+    return null;
   }
 
   async approachForDialogue(

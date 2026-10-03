@@ -6,7 +6,7 @@ import { CharacterMovement } from "../systems/CharacterMovement";
 import { PlaybackController } from "../systems/PlaybackController";
 import { CameraController } from "../systems/CameraController";
 import { CharacterSprite } from "../objects/CharacterSprite";
-import { getCharacterColor, actionToEmoji, createCharacterDisplayMetrics } from "../config/game-config";
+import { getCharacterColor, actionToEmoji, createCharacterDisplayMetrics, SPRITE_FRAME_WIDTH, SPRITE_FRAME_HEIGHT } from "../config/game-config";
 import { apiClient } from "../ui/services/api-client";
 import type { CharacterInfo, DialogueEventData, SimulationEvent } from "../types/api";
 
@@ -152,6 +152,81 @@ export class WorldScene extends Phaser.Scene {
     const onSceneSyncCharacters = () => {
       void this.trackPlaybackAsync(this.handleSceneDayChange());
     };
+    // 人设/任务被编辑后：只刷新头顶的 ★ 任务标志，不动位置（避免角色被传送）
+    const onCharactersChanged = () => {
+      void this.refreshQuestBadges();
+    };
+    // 人设改名：只更新地图上的姓名标签，不重算位置（避免角色瞬移）
+    const onCharacterRenamed = (payload: { id: string; name: string }) => {
+      this.characterSprites.get(payload.id)?.setCharacterName(payload.name);
+    };
+    // 删除角色：直接从地图上移除对应精灵
+    const onCharacterDeleted = (payload: { id: string }) => {
+      if (!payload?.id) return;
+      const sprite = this.characterSprites.get(payload.id);
+      if (sprite) {
+        sprite.destroy();
+        this.characterSprites.delete(payload.id);
+      }
+    };
+    // 锚定变更：更新该精灵的活动范围限制，并把角色移到锚点（不重算其他角色位置）
+    const onCharacterAnchorChanged = (payload: {
+      id: string;
+      anchor: { type: "region" | "element"; targetId: string } | null;
+    }) => {
+      const sprite = this.characterSprites.get(payload?.id);
+      if (!sprite) return;
+      sprite.profileAnchor = payload.anchor ?? null;
+      if (!payload.anchor) return;
+
+      const location =
+        payload.anchor.type === "region" ? payload.anchor.targetId : "main_area";
+      const mainAreaPointId =
+        payload.anchor.type === "element" ? `element_${payload.anchor.targetId}` : null;
+      const pos = this.getCharacterPlacement(
+        { id: payload.id, location, mainAreaPointId } as CharacterInfo,
+        new Map(),
+      );
+      sprite.stopMoving();
+      sprite.setPosition(pos.x, pos.y);
+      sprite.currentLocationId = location;
+      sprite.mainAreaPointId = mainAreaPointId;
+      sprite.setMovementAnchor({
+        x: pos.x,
+        y: pos.y,
+        pinned: this.mapManager.isPinnedLocation(location) || !!payload.anchor,
+      });
+    };
+    // 新建角色：按需动态加载立绘贴图，然后重建该角色的精灵（无需刷新页面）
+    const onCharacterCreated = (payload: { id: string; hasSprite?: boolean }) => {
+      if (!payload?.id) return;
+      const rebuild = () => {
+        if (this.textures.exists(payload.id)) {
+          this.textures.get(payload.id).setFilter(Phaser.Textures.FilterMode.LINEAR);
+        }
+        const existing = this.characterSprites.get(payload.id);
+        if (existing) {
+          existing.destroy();
+          this.characterSprites.delete(payload.id);
+        }
+        void this.trackPlaybackAsync(this.syncCharactersFromServer());
+      };
+
+      if (!payload.hasSprite || this.textures.exists(payload.id)) {
+        rebuild();
+        return;
+      }
+
+      this.load.spritesheet(payload.id, `/assets/characters/${payload.id}/spritesheet.png`, {
+        frameWidth: SPRITE_FRAME_WIDTH,
+        frameHeight: SPRITE_FRAME_HEIGHT,
+      });
+      // 加载完成（含失败）后再重建，避免贴图未就绪时仍渲染成圆点
+      this.load.once(Phaser.Loader.Events.COMPLETE, rebuild);
+      if (!this.load.isLoading()) {
+        this.load.start();
+      }
+    };
     const onTickPlaybackStarted = () => {
       this.tickPlaybackActive = true;
       this.tickPlaybackEventsFlushed = false;
@@ -182,6 +257,11 @@ export class WorldScene extends Phaser.Scene {
     this.eventBus.on("toggle_debug_interactive_objects_overlay", onToggleInteractiveObjectsOverlay);
     this.eventBus.on("time_update", onTimeUpdate);
     this.eventBus.on("scene_sync_characters", onSceneSyncCharacters);
+    this.eventBus.on("characters_changed", onCharactersChanged);
+    this.eventBus.on("character_renamed", onCharacterRenamed);
+    this.eventBus.on("character_created", onCharacterCreated);
+    this.eventBus.on("character_anchor_changed", onCharacterAnchorChanged);
+    this.eventBus.on("character_deleted", onCharacterDeleted);
     this.eventBus.on("tick_playback_started", onTickPlaybackStarted);
     this.eventBus.on("tick_playback_events_flushed", onTickPlaybackEventsFlushed);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -191,6 +271,11 @@ export class WorldScene extends Phaser.Scene {
       this.eventBus.off("toggle_debug_interactive_objects_overlay", onToggleInteractiveObjectsOverlay);
       this.eventBus.off("time_update", onTimeUpdate);
       this.eventBus.off("scene_sync_characters", onSceneSyncCharacters);
+      this.eventBus.off("characters_changed", onCharactersChanged);
+      this.eventBus.off("character_renamed", onCharacterRenamed);
+      this.eventBus.off("character_created", onCharacterCreated);
+      this.eventBus.off("character_anchor_changed", onCharacterAnchorChanged);
+      this.eventBus.off("character_deleted", onCharacterDeleted);
       this.eventBus.off("tick_playback_started", onTickPlaybackStarted);
       this.eventBus.off("tick_playback_events_flushed", onTickPlaybackEventsFlushed);
     });
@@ -339,19 +424,35 @@ export class WorldScene extends Phaser.Scene {
   ): void {
     sprite.stopMoving();
     sprite.clearTransientUi();
+    sprite.setCharacterName(char.name);
     sprite.setPosition(pos.x, pos.y);
     sprite.currentLocationId = char.location;
     sprite.mainAreaPointId = char.mainAreaPointId ?? null;
     sprite.profileAnchor = char.anchor || null;
+    sprite.questObjectIds = char.questFocus?.objectIds ?? [];
+    sprite.setHasQuest(!!char.questFocus);
     sprite.setCurrentAction(char.currentAction);
     sprite.setActionIcon(actionToEmoji(char.currentAction));
-    sprite.setActionLabel(null);
     sprite.setMovementAnchor({
       x: pos.x,
       y: pos.y,
       pinned: this.mapManager.isPinnedLocation(char.location) || !!char.anchor,
     });
     sprite.syncOverlayZoom(zoom);
+  }
+
+  /** 只更新每个角色头顶的 ★ 任务标志（人设/任务被编辑后调用，不动位置） */
+  private async refreshQuestBadges(): Promise<void> {
+    try {
+      const characters = await apiClient.getCharacters();
+      for (const char of characters) {
+        const sprite = this.characterSprites.get(char.id);
+        if (!sprite) continue;
+        sprite.setHasQuest(!!char.questFocus);
+      }
+    } catch (error) {
+      console.warn("[WorldScene] Failed to refresh quest badges:", error);
+    }
   }
 
   private async handleSceneDayChange(): Promise<void> {
@@ -385,7 +486,7 @@ export class WorldScene extends Phaser.Scene {
           const sprite = this.characterSprites.get(event.actorId);
           sprite?.setCurrentAction(null);
           sprite?.setActionIcon("");
-          sprite?.setActionLabel(null);
+          sprite?.setStatusIconOverride("🚶");
           const pointId =
             typeof event.data?.toPointId === "string" ? event.data.toPointId : null;
           void this.trackPlaybackAsync(
@@ -393,7 +494,7 @@ export class WorldScene extends Phaser.Scene {
               force: true,
               mainAreaPointId: pointId,
             }),
-          );
+          ).finally(() => sprite?.setStatusIconOverride(null));
           this.maybeShowActionMonologue(event);
         }
         break;
@@ -405,12 +506,6 @@ export class WorldScene extends Phaser.Scene {
         if (sprite) {
           sprite.setCurrentAction(actionId);
           sprite.setActionIcon(actionToEmoji(actionId));
-          const actionType = event.data?.actionType;
-          if (actionType === "interact_object") {
-            sprite.setActionLabel(event.data?.interactionName || actionToEmoji(actionId) || null);
-          } else {
-            sprite.setActionLabel(null);
-          }
         }
         const objectId = event.data?.objectId ?? event.targetId;
         if (objectId && event.actorId && event.data?.actionType === "interact_object") {
@@ -427,7 +522,6 @@ export class WorldScene extends Phaser.Scene {
         if (sprite) {
           sprite.setCurrentAction(null);
           sprite.setActionIcon("");
-          sprite.setActionLabel(null);
         }
         break;
       }
@@ -535,7 +629,6 @@ export class WorldScene extends Phaser.Scene {
       if (!sprite) continue;
       sprite.setCurrentAction(action);
       sprite.setActionIcon(actionToEmoji(action));
-      sprite.setActionLabel(null);
     }
   }
 
