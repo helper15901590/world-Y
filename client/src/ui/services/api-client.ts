@@ -13,24 +13,65 @@ import type {
   TimelineMeta,
   TimelineWithWorld,
   TimelineFrame,
+  WorldPromptInfo,
+  EnvironmentLocationInfo,
+  EnvironmentObjectInfo,
 } from "../../types/api";
 
 const API_BASE = "/api";
+
+/**
+ * 管理员会话令牌（内存保存，刷新页面即失效）。
+ * 解锁 TopBar 后由 adminLogin 返回，随每个请求以 x-admin-token 头发送。
+ */
+let adminToken: string | null = null;
+let onAdminRequired: (() => void) | null = null;
+
+export function setAdminToken(token: string | null): void {
+  adminToken = token;
+}
+
+/** 令牌失效（服务端要求重新鉴权）时的回调：界面重新上锁 */
+export function setAdminRequiredHandler(handler: (() => void) | null): void {
+  onAdminRequired = handler;
+}
+
+/**
+ * API 错误：携带 HTTP 状态码与服务端结构化错误码（如 NAME_TAKEN / EDIT_PASSWORD_REQUIRED）。
+ * message 保持 "API <status>: <error>" 格式，方便旧代码按文本匹配。
+ */
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public code: string | null,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 async function requestJSON<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  const headers = new Headers(init?.headers);
+  if (adminToken) headers.set("x-admin-token", adminToken);
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     let detail = "";
+    let body: { error?: string; code?: string } | null = null;
     try {
-      const body = await res.json();
-      detail = body.error ? `: ${body.error}` : "";
+      body = await res.json();
+      detail = body?.error ? `: ${body.error}` : "";
     } catch {
       // Ignore non-JSON error bodies.
     }
-    throw new Error(`API ${res.status}${detail}`);
+    if (res.status === 401 && body?.code === "ADMIN_REQUIRED") {
+      adminToken = null;
+      onAdminRequired?.();
+    }
+    throw new ApiError(res.status, `API ${res.status}${detail}`, body?.code ?? null);
   }
   return res.json();
 }
@@ -134,8 +175,94 @@ export const apiClient = {
     return fetchJSON("/world/info");
   },
 
+  getWorldPrompt(): Promise<WorldPromptInfo> {
+    return fetchJSON("/world/prompt");
+  },
+
+  getEnvironment(): Promise<{ locations: EnvironmentLocationInfo[] }> {
+    return fetchJSON("/world/environment");
+  },
+
+  updateEnvironmentLocation(
+    locationId: string,
+    patch: { name?: string; description?: string },
+  ): Promise<{ ok: boolean; persisted: boolean; location: { id: string; name: string; description: string } }> {
+    return patchJSON(`/world/environment/location/${locationId}`, patch);
+  },
+
+  updateEnvironmentObject(
+    objectId: string,
+    patch: { name?: string; state?: string; stateDescription?: string },
+  ): Promise<{ ok: boolean; persisted: boolean; object: EnvironmentObjectInfo | null }> {
+    return patchJSON(`/world/environment/object/${objectId}`, patch);
+  },
+
+  updateWorldPrompt(
+    patch: Partial<WorldPromptInfo>,
+  ): Promise<WorldPromptInfo & { ok: boolean; persisted: boolean }> {
+    return patchJSON("/world/prompt", patch);
+  },
+
   getGeneratedWorlds(): Promise<GeneratedWorldListResponse> {
     return fetchJSON("/world/worlds");
+  },
+
+  createCharacter(payload: {
+    name: string;
+    nickname?: string;
+    appearanceHint?: string;
+    gender?: string;
+    age?: string;
+    department?: string;
+    position?: string;
+    jobTitle?: string;
+    backstory?: string;
+    startPosition?: string;
+    spriteSourceId?: string;
+    coreQuest?: string;
+  }): Promise<{
+    ok: boolean;
+    persisted: boolean;
+    spriteCopied: boolean;
+    character: { id: string; name: string; hasSprite: boolean };
+  }> {
+    return postJSON("/characters", payload);
+  },
+
+  /** 管理员：读取某角色的编辑密码（用于分发给玩家） */
+  getCharacterEditPassword(id: string): Promise<{ ok: boolean; characterId: string; editPassword: string | null }> {
+    return fetchJSON(`/characters/${id}/edit-password`);
+  },
+
+  /** 管理员会话：是否需要密码、当前是否已解锁 */
+  getAdminSession(): Promise<{ required: boolean; authenticated: boolean }> {
+    return fetchJSON("/admin/session");
+  },
+
+  adminLogin(password: string): Promise<{ ok: boolean; required: boolean; token: string | null }> {
+    return postJSON("/admin/login", { password });
+  },
+
+  adminLogout(): Promise<{ ok: boolean }> {
+    return postJSON("/admin/logout");
+  },
+
+  /** 校验角色的编辑密码（「改人设」的进门校验） */
+  verifyCharacterEditPassword(id: string, editPassword: string): Promise<{ ok: boolean }> {
+    return postJSON(`/characters/${id}/edit-password/verify`, { editPassword });
+  },
+
+  /** 管理员：重置某角色的编辑密码 */
+  regenerateCharacterEditPassword(id: string): Promise<{ ok: boolean; characterId: string; editPassword: string }> {
+    return postJSON(`/characters/${id}/edit-password/regenerate`);
+  },
+
+  deleteCharacter(id: string): Promise<{
+    ok: boolean;
+    deleted: { id: string; name: string };
+    memoriesRemoved: number;
+  }> {
+    return deleteJSON(`/characters/${id}`);
   },
 
   getLocations(): Promise<LocationInfo[]> {

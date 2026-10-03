@@ -5,6 +5,10 @@ import { BootScene } from "./scenes/BootScene";
 import { WorldScene } from "./scenes/WorldScene";
 import { App } from "./ui/App";
 import { EventBus } from "./EventBus";
+import { armMusicAutoStart } from "./music";
+
+// 背景音乐：首次点击/按键后自动开始（浏览器不允许未经交互的自动播放）
+armMusicAutoStart();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,

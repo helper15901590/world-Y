@@ -4,6 +4,7 @@ import { CharacterDetail } from "./CharacterDetail";
 import { apiClient } from "../services/api-client";
 import type { CharacterInfo, SimulationEvent } from "../../types/api";
 import { formatActionName } from "../utils/event-format";
+import { EventBus } from "../../EventBus";
 
 export function SidePanel({
   selectedCharId,
@@ -32,11 +33,17 @@ export function SidePanel({
   };
 
   useEffect(() => {
-    apiClient.getCharacters().then(setCharacters).catch(console.warn);
-    const timer = setInterval(() => {
+    const refresh = () => {
       apiClient.getCharacters().then(setCharacters).catch(console.warn);
-    }, 15000);
-    return () => clearInterval(timer);
+    };
+    refresh();
+    const timer = setInterval(refresh, 15000);
+    // 「改人设」保存后立即刷新列表（如改名），不用等下一次轮询
+    EventBus.instance.on("characters_changed", refresh);
+    return () => {
+      clearInterval(timer);
+      EventBus.instance.off("characters_changed", refresh);
+    };
   }, []);
 
   useEffect(() => {

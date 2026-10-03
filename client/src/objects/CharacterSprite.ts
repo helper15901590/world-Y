@@ -24,6 +24,14 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
   isMoving = false;
   movementAnchor: MovementAnchor | null = null;
   profileAnchor: { type: "region" | "element"; targetId: string } | null = null;
+  /** 核心任务命中的物件 id：闲逛时会优先溜达到这些物件附近（见 CharacterMovement.idleWander） */
+  questObjectIds: string[] = [];
+  /** 头顶状态标志：是否有进行中的核心任务（显示为金色的 ★ 徽标） */
+  hasQuest = false;
+  /** 基础动作图标（由场景按当前动作设置） */
+  private baseActionIcon = "";
+  /** 状态图标的临时覆盖（如移动时的 🚶），设置期间优先显示 */
+  private statusIconOverride: string | null = null;
 
   private shadow!: Phaser.GameObjects.Ellipse;
   private bodyCircle: Phaser.GameObjects.Arc | null = null;
@@ -52,7 +60,7 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
   private nameRowEl: HTMLDivElement | null = null;
   private nameEl: HTMLDivElement | null = null;
   private actionIconEl: HTMLSpanElement | null = null;
-  private actionPillEl: HTMLDivElement | null = null;
+  private questBadgeEl: HTMLSpanElement | null = null;
   private hasSprite = false;
   private facing: FacingDirection = "down";
   private overlayZoom = 1;
@@ -159,16 +167,18 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
     name.className = "character-label__name";
     name.textContent = this.characterName;
 
+    // 核心任务徽标：金色 ★（只在小标志系统里出现，不带文字）
+    const questBadge = document.createElement("span");
+    questBadge.className = "character-label__quest";
+    questBadge.textContent = "★";
+    questBadge.style.display = "none";
+
     const icon = document.createElement("span");
     icon.className = "character-label__icon";
     icon.style.display = "none";
 
-    const actionPill = document.createElement("div");
-    actionPill.className = "character-label__action-pill";
-    actionPill.style.display = "none";
-
-    nameRow.append(name, icon);
-    root.append(nameRow, actionPill);
+    nameRow.append(questBadge, name, icon);
+    root.append(nameRow);
     overlayRoot.appendChild(root);
     this.createDomDialogueBubble(overlayRoot);
 
@@ -176,10 +186,11 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
     this.nameRowEl = nameRow;
     this.nameEl = name;
     this.actionIconEl = icon;
-    this.actionPillEl = actionPill;
+    this.questBadgeEl = questBadge;
     this.updateDomLabelStyle();
     this.updateDomLabelVisibility();
     this.updateDomLabelPosition();
+    this.updateQuestBadge();
   }
 
   private createDomDialogueBubble(overlayRoot: HTMLElement): void {
@@ -396,6 +407,37 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
     this.currentAction = action;
   }
 
+  /** 是否有进行中的核心任务：头顶显示金色 ★ 徽标 */
+  setHasQuest(hasQuest: boolean): void {
+    if (this.hasQuest === hasQuest) return;
+    this.hasQuest = hasQuest;
+    this.updateQuestBadge();
+  }
+
+  /**
+   * 临时状态图标覆盖（如移动中的 🚶）；传 null 恢复为按当前动作显示的图标。
+   * 头顶状态全部用「小标志」表达：★任务 / 🚶移动 / 💬对话 / 各动作自身的图标。
+   */
+  setStatusIconOverride(icon: string | null): void {
+    const next = icon?.trim() || null;
+    if (this.statusIconOverride === next) return;
+    this.statusIconOverride = next;
+    this.renderActionIcon();
+  }
+
+  private updateQuestBadge(): void {
+    if (!this.questBadgeEl) return;
+    this.questBadgeEl.style.display = this.hasQuest ? "inline-block" : "none";
+  }
+
+  /** 同步角色名（「改人设」里改名后，地图上的姓名标签需要跟着变）。 */
+  setCharacterName(name: string): void {
+    const next = name?.trim();
+    if (!next || next === this.characterName) return;
+    this.characterName = next;
+    if (this.nameEl) this.nameEl.textContent = next;
+  }
+
   setMovementAnchor(anchor: MovementAnchor | null): void {
     this.movementAnchor = anchor ? { ...anchor } : null;
   }
@@ -522,20 +564,16 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
   }
 
   setActionIcon(emoji: string): void {
-    if (!this.actionIconEl) return;
-    this.actionIconEl.textContent = emoji;
-    this.actionIconEl.style.display = emoji ? "inline-block" : "none";
+    this.baseActionIcon = emoji ?? "";
+    this.renderActionIcon();
   }
 
-  setActionLabel(text: string | null): void {
-    if (!this.actionPillEl) return;
-    if (text) {
-      this.actionPillEl.textContent = text;
-      this.actionPillEl.style.display = "block";
-    } else {
-      this.actionPillEl.style.display = "none";
-      this.actionPillEl.textContent = "";
-    }
+  /** 实际渲染：状态图标覆盖 > 当前动作图标；空字符串表示不显示图标 */
+  private renderActionIcon(): void {
+    if (!this.actionIconEl) return;
+    const emoji = this.statusIconOverride ?? this.baseActionIcon;
+    this.actionIconEl.textContent = emoji;
+    this.actionIconEl.style.display = emoji ? "inline-block" : "none";
   }
 
   clearTransientUi(): void {
@@ -580,10 +618,9 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
     this.nameEl.style.fontSize = `${nameSize}px`;
     this.actionIconEl.style.fontSize = `${iconSize}px`;
 
-    if (this.actionPillEl) {
-      const actionPillSize = Phaser.Math.Clamp(this.displayMetrics.labelNameWorldSize * zoom * 0.75, 9, 18);
-      this.actionPillEl.style.fontSize = `${actionPillSize}px`;
-      this.actionPillEl.style.padding = `${Math.max(2, actionPillSize * 0.3)}px ${Math.max(6, actionPillSize * 0.8)}px`;
+    if (this.questBadgeEl) {
+      const badgeSize = Phaser.Math.Clamp(this.displayMetrics.labelNameWorldSize * zoom * 0.8, 9, 18);
+      this.questBadgeEl.style.fontSize = `${badgeSize}px`;
     }
 
     this.updateDialogueBubbleStyle();
@@ -606,7 +643,7 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
     }
 
     const zoom = Math.max(this.overlayZoom, 0.01);
-    const fontSize = Phaser.Math.Clamp(this.displayMetrics.bubbleFontSize * zoom * 0.93, 11, 26);
+    const fontSize = Phaser.Math.Clamp(this.displayMetrics.bubbleFontSize * zoom * 0.93, 10, 20);
     const innerFontSize = Phaser.Math.Clamp(fontSize * 0.75, 9, 20);
     const wrapWidth = Math.max(
       210,
@@ -808,7 +845,7 @@ export class CharacterSprite extends Phaser.GameObjects.Container {
     this.nameRowEl = null;
     this.nameEl = null;
     this.actionIconEl = null;
-    this.actionPillEl = null;
+    this.questBadgeEl = null;
     super.destroy(fromScene);
   }
 }

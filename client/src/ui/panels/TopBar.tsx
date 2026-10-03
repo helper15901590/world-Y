@@ -4,12 +4,14 @@ import type { CSSProperties, ChangeEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { WorldTimeInfo, TimelineMeta } from "../../types/api";
-import { apiClient } from "../services/api-client";
+import { apiClient, setAdminToken, setAdminRequiredHandler, ApiError } from "../services/api-client";
 import type { WorldInfo, GeneratedWorldSummary } from "../services/api-client";
 import { GodPanel } from "./GodPanel";
 import { SandboxChatPanel } from "./SandboxChatPanel";
 import { TimelineManagerModal } from "./TimelineManagerModal";
 import { LanguageToggle } from "../components/LanguageToggle";
+import { MusicToggle } from "../components/MusicToggle";
+import { HelpModal } from "../components/HelpModal";
 import { translatePeriod } from "../utils/time-i18n";
 import { sortLibraryWorldsForLocale } from "../utils/library-world-sort";
 
@@ -66,6 +68,7 @@ export function TopBar({
   const [isSwitchingWorld, setIsSwitchingWorld] = useState(false);
   const [godPanelOpen, setGodPanelOpen] = useState(false);
   const [sandboxChatOpen, setSandboxChatOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [showPauseToast, setShowPauseToast] = useState(false);
   const [isChangingTickGranularity, setIsChangingTickGranularity] = useState(false);
   const [managerModalOpen, setManagerModalOpen] = useState(false);
@@ -208,7 +211,7 @@ export function TopBar({
     setTimeout(() => setShowPauseToast(false), 3500);
   };
 
-  const worldName = worldInfo?.worldName || "WorldX";
+  const worldName = worldInfo?.worldName || "World-Y";
   const period = gameTime.period ? translatePeriod(gameTime.period) : "";
   const timeLabel = gameTime.timeString
     ? (period
@@ -288,27 +291,134 @@ export function TopBar({
     }
   };
 
+  // ── 管理员锁：未解锁时整个工具栏只显示密码输入 ──
+  const [adminRequired, setAdminRequired] = useState(false);
+  const [adminUnlocked, setAdminUnlocked] = useState(true);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [adminChecked, setAdminChecked] = useState(false);
+
+  useEffect(() => {
+    apiClient
+      .getAdminSession()
+      .then((session) => {
+        setAdminRequired(session.required);
+        setAdminUnlocked(!session.required || session.authenticated);
+      })
+      .catch((err) => {
+        console.warn("[TopBar] admin session check failed", err);
+        setAdminUnlocked(true); // 检查失败时不锁死界面
+      })
+      .finally(() => setAdminChecked(true));
+
+    // 令牌失效时（例如服务重启）自动重新上锁
+    setAdminRequiredHandler(() => {
+      setAdminRequired(true);
+      setAdminUnlocked(false);
+      setAdminPassword("");
+    });
+    return () => setAdminRequiredHandler(null);
+  }, []);
+
+  const doAdminLogin = async () => {
+    const password = adminPassword.trim();
+    if (!password) {
+      setAdminError(t("topbar.adminPasswordRequired"));
+      return;
+    }
+    setAdminBusy(true);
+    try {
+      const resp = await apiClient.adminLogin(password);
+      setAdminToken(resp.token ?? null);
+      setAdminUnlocked(true);
+      setAdminPassword("");
+      setAdminError(null);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      const wrongPassword =
+        (err instanceof ApiError && err.code === "ADMIN_PASSWORD_WRONG") ||
+        raw.includes("401");
+      setAdminError(wrongPassword ? t("topbar.adminPasswordWrong") : raw);
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
+  const doAdminLock = async () => {
+    try {
+      await apiClient.adminLogout();
+    } catch {
+      // 忽略：无论如何本地都重新上锁
+    }
+    setAdminToken(null);
+    setAdminUnlocked(false);
+    setAdminPassword("");
+  };
+
+  // 管理员状态检查完成前：渲染空条，避免整条工具栏在锁定前一闪而过
+  if (!adminChecked) {
+    return <div ref={barRef} style={topBarStyle} />;
+  }
+
+  // 未解锁：工具栏只保留密码框，所有菜单都不显示
+  if (adminChecked && adminRequired && !adminUnlocked) {
+    return (
+      <div ref={barRef} style={topBarStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>🔒 World-Y</span>
+          <span style={{ fontSize: 11, opacity: 0.65 }}>{t("topbar.adminLockHint")}</span>
+          <input
+            type="password"
+            value={adminPassword}
+            onChange={(e) => setAdminPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void doAdminLogin();
+            }}
+            placeholder={t("topbar.adminPasswordPlaceholder")}
+            style={adminPasswordInputStyle}
+          />
+          <button onClick={doAdminLogin} disabled={adminBusy} style={chipBtnStyle(false)}>
+            {adminBusy ? t("topbar.unlocking") : t("topbar.unlock")}
+          </button>
+          {adminError && <span style={{ fontSize: 11, color: "#ffb0b0" }}>{adminError}</span>}
+
+          {/* 玩家功能：不需要管理员密码，与解锁密码同一层级 */}
+          <span style={{ width: 1, height: 18, background: "rgba(255,255,255,0.12)", flexShrink: 0, margin: "0 4px" }} />
+          <button
+            onClick={() => {
+              setSandboxChatOpen(true);
+              pauseWorldIfNeeded();
+            }}
+            style={chipBtnStyle(sandboxChatOpen)}
+            title={t("topbar.sandboxChatTitle")}
+          >
+            {t("topbar.sandboxChat")}
+          </button>
+          <button
+            onClick={() => setHelpOpen(true)}
+            style={chipBtnStyle(helpOpen)}
+            title={t("topbar.helpTitle")}
+          >
+            ❓ {t("topbar.help")}
+          </button>
+          <MusicToggle />
+        </div>
+
+        {sandboxChatOpen && typeof document !== "undefined"
+          ? createPortal(<SandboxChatPanel onClose={() => setSandboxChatOpen(false)} />, document.body)
+          : null}
+        {helpOpen && typeof document !== "undefined"
+          ? createPortal(<HelpModal onClose={() => setHelpOpen(false)} />, document.body)
+          : null}
+      </div>
+    );
+  }
+
   return (
     <div
       ref={barRef}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        background: "linear-gradient(180deg, rgba(10,12,24,0.96), rgba(10,12,24,0.92))",
-        backdropFilter: "blur(10px)",
-        display: "flex",
-        flexDirection: "column",
-        padding: "10px 14px",
-        gap: 10,
-        color: "#e0e0e0",
-        fontSize: 13,
-        zIndex: 100,
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 10px 28px rgba(0,0,0,0.24)",
-        pointerEvents: "auto",
-      }}
+      style={topBarStyle}
     >
       {/* Row 1: status info + world/timeline selectors + mode toggle + play */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
@@ -521,7 +631,25 @@ export function TopBar({
             {isDevMode ? "🛠️ Dev" : "🛠️"}
           </button>
 
+          <button
+            onClick={() => setHelpOpen(true)}
+            style={chipBtnStyle(helpOpen)}
+            title={t("topbar.helpTitle")}
+          >
+            ❓ {t("topbar.help")}
+          </button>
+
           <LanguageToggle />
+          <MusicToggle />
+          {adminRequired && (
+            <button
+              onClick={doAdminLock}
+              style={chipBtnStyle(false)}
+              title={t("topbar.lockTitle")}
+            >
+              🔓
+            </button>
+          )}
         </div>
       </div>
 
@@ -560,11 +688,45 @@ export function TopBar({
       {managerModalOpen && typeof document !== "undefined"
         ? createPortal(<TimelineManagerModal onClose={() => setManagerModalOpen(false)} />, document.body)
         : null}
+      {helpOpen && typeof document !== "undefined"
+        ? createPortal(<HelpModal onClose={() => setHelpOpen(false)} />, document.body)
+        : null}
     </div>
   );
 }
 
 // --- Styles ---
+
+const topBarStyle: CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  background: "linear-gradient(180deg, rgba(10,12,24,0.96), rgba(10,12,24,0.92))",
+  backdropFilter: "blur(10px)",
+  display: "flex",
+  flexDirection: "column",
+  padding: "10px 14px",
+  gap: 10,
+  color: "#e0e0e0",
+  fontSize: 13,
+  zIndex: 100,
+  borderBottom: "1px solid rgba(255,255,255,0.08)",
+  boxShadow: "0 10px 28px rgba(0,0,0,0.24)",
+  pointerEvents: "auto",
+};
+
+const adminPasswordInputStyle: CSSProperties = {
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 6,
+  color: "#e8e8ea",
+  padding: "5px 10px",
+  fontSize: 13,
+  fontFamily: "monospace",
+  letterSpacing: 1,
+  minWidth: 220,
+};
 
 const primaryBtnStyle: CSSProperties = {
   color: "#fff",

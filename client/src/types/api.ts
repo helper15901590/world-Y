@@ -27,6 +27,31 @@ export interface SceneRuntimeInfo {
   transitionEnabled: boolean;
 }
 
+export interface EnvironmentObjectInfo {
+  id: string;
+  name: string;
+  /** 运行时状态（如 available / broken），角色可感知 */
+  state: string;
+  /** 状态描述，直接显示给角色 */
+  stateDescription: string;
+  capacity: number;
+  currentUsers: string[];
+}
+
+export interface EnvironmentLocationInfo {
+  id: string;
+  name: string;
+  description: string;
+  objects: EnvironmentObjectInfo[];
+}
+
+export interface WorldPromptInfo {
+  worldName: string;
+  worldDescription: string;
+  /** 实际生效的"世界背景"提示词（已应用"留空回退到世界简介"规则） */
+  worldSocialContext: string;
+}
+
 export interface CharacterInfo {
   id: string;
   name: string;
@@ -38,6 +63,15 @@ export interface CharacterInfo {
   currentAction: string | null;
   currentActionLabel?: string | null;
   anchor?: { type: "region" | "element"; targetId: string } | null;
+  /** 核心任务命中的地点/物件（闲逛时会偏向这些位置；无任务或没有命中时为 null） */
+  questFocus?: { locationIds: string[]; objectIds: string[] } | null;
+}
+
+export interface CharacterInitialMemory {
+  type?: string;
+  content: string;
+  importance?: number;
+  tags?: string[];
 }
 
 export interface CharacterProfile {
@@ -47,12 +81,36 @@ export interface CharacterProfile {
   nickname: string;
   backstory?: string;
   appearanceHint?: string;
+  gender?: string;
+  age?: string;
+  department?: string;
+  position?: string;
+  jobTitle?: string;
   coreMotivation: string;
   coreValues: string[];
   speakingStyle: string;
+  skills?: string[];
+  preferredActivities?: string[];
   fears: string[];
+  dislikes?: string[];
+  initialMemories?: CharacterInitialMemory[];
+  iconicCues?: {
+    speechQuirks?: string[];
+    catchphrases?: string[];
+    behavioralTics?: string[];
+  };
+  canonicalRefs?: {
+    source?: string;
+    keyRelationships?: string[];
+    signatureMoments?: string[];
+  };
   socialStyle: string;
   tags: string[];
+  anchor?: { type: string; targetId: string } | null;
+  /** 核心任务：填写即启动（清空即停止），会注入决策/对话提示词并影响移动方向 */
+  coreQuest?: string;
+  /** 服务端只在公开档案里返回该标志，密码本身不下发 */
+  hasEditPassword?: boolean;
   [key: string]: unknown;
 }
 
@@ -68,6 +126,13 @@ export interface CharacterDetail {
     curiosity: number;
   };
   emotionLabel: string;
+  /** 核心任务的行动步骤（AI 规划、角色可自行修订；无任务时为 null） */
+  questPlan?: {
+    quest: string;
+    steps: string[];
+    updatedDay: number;
+    updatedTick: number;
+  } | null;
 }
 
 export interface DiaryEntry {

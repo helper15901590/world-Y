@@ -14,6 +14,7 @@ import type { LLMClient } from "../llm/llm-client.js";
 import type { PromptBuilder } from "../llm/prompt-builder.js";
 import { DecisionMaker } from "./decision-maker.js";
 import { DialogueGenerator } from "./dialogue-generator.js";
+import { QuestPlanner } from "./quest-planner.js";
 import { buildPerception } from "./perceiver.js";
 import { buildActionMenu } from "./action-menu-builder.js";
 import { executeAction, completeAction } from "./action-executor.js";
@@ -54,6 +55,7 @@ type TickIntent = {
 export class SimulationEngine {
   private decisionMaker: DecisionMaker;
   private dialogueGenerator: DialogueGenerator;
+  readonly questPlanner: QuestPlanner;
   private memoryEvalQueue: Promise<void> = Promise.resolve();
 
   constructor(
@@ -61,12 +63,17 @@ export class SimulationEngine {
     private characterManager: CharacterManager,
     private llmClient: LLMClient,
     private promptBuilder: PromptBuilder,
+    questPlanner?: QuestPlanner,
   ) {
+    this.questPlanner =
+      questPlanner ??
+      new QuestPlanner(llmClient, promptBuilder, characterManager, worldManager);
     this.decisionMaker = new DecisionMaker(
       llmClient,
       promptBuilder,
       characterManager,
       worldManager,
+      this.questPlanner,
     );
     this.dialogueGenerator = new DialogueGenerator(
       llmClient,

@@ -14,9 +14,18 @@ export const ActionDecisionSchema = z.object({
   interactionId: z.string().optional(),
   reason: z.string().min(5),
   innerMonologue: z.string().optional(),
+  /** 角色自行修订的核心任务行动步骤（仅在需要调整时输出完整新步骤） */
+  questPlan: z.array(z.string().min(2).max(80)).min(2).max(8).optional(),
 });
 
 export type ActionDecisionOutput = z.infer<typeof ActionDecisionSchema>;
+
+/** 核心任务行动计划输出（QuestPlanner 使用） */
+export const QuestPlanSchema = z.object({
+  steps: z.array(z.string().min(2).max(80)).min(2).max(8),
+});
+
+export type QuestPlanOutput = z.infer<typeof QuestPlanSchema>;
 
 /** 4.2 对话生成输出 */
 export const DialogueResultSchema = z.object({

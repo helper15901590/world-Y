@@ -1,6 +1,6 @@
 /**
  * Orchestrator LLM client — OpenAI-compatible chat completions.
- * Reads ORCHESTRATOR_* env vars. Loads env from WorldX root.
+ * Reads ORCHESTRATOR_* env vars. Loads env from World-Y root.
  */
 
 import dotenv from "dotenv";

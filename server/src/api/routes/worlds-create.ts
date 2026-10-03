@@ -5,10 +5,11 @@ import {
   JobConflictError,
   type JobEvent,
 } from "../../core/create-job-manager.js";
+import { requireAdmin } from "../../services/admin-auth.js";
 
 const router = Router();
 
-router.post("/create", (req, res) => {
+router.post("/create", requireAdmin, (req, res) => {
   const prompt = typeof req.body?.prompt === "string" ? req.body.prompt : "";
   const sizeKRaw = req.body?.sizeK;
   const sizeK = Number(sizeKRaw) as 1 | 2 | 4;
@@ -57,7 +58,7 @@ router.get("/jobs/:jobId", (req, res) => {
   res.json(snapshot);
 });
 
-router.post("/jobs/:jobId/cancel", (req, res) => {
+router.post("/jobs/:jobId/cancel", requireAdmin, (req, res) => {
   try {
     createJobManager.cancelJob(String(req.params.jobId));
     res.json({ ok: true });

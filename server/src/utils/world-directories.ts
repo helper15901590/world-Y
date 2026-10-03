@@ -81,7 +81,7 @@ function readWorldName(worldDir: string): string | null {
         return parsed.worldName.trim();
       }
     } catch (error) {
-      console.warn(`[WorldX] Failed to read world metadata from ${filePath}:`, error);
+      console.warn(`[World-Y] Failed to read world metadata from ${filePath}:`, error);
     }
   }
 

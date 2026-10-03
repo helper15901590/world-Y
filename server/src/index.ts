@@ -10,6 +10,7 @@ import { appContext } from "./services/app-context.js";
 import { setupWebSocket } from "./api/websocket.js";
 
 import worldRoutes from "./api/routes/world.js";
+import adminRoutes from "./api/routes/admin.js";
 import worldsCreateRoutes from "./api/routes/worlds-create.js";
 import characterRoutes from "./api/routes/characters.js";
 import eventsRoutes from "./api/routes/events.js";
@@ -64,13 +65,13 @@ async function main() {
 
   const worldDir = resolveInitialWorldDir();
   if (worldDir) {
-    console.log(`[WorldX] World dir: ${worldDir}`);
+    console.log(`[World-Y] World dir: ${worldDir}`);
   } else {
-    console.log("[WorldX] No generated world found — server starting in empty mode. Navigate to /create to generate your first world.");
+    console.log("[World-Y] No generated world found — server starting in empty mode. Navigate to /create to generate your first world.");
   }
 
   await appContext.initialize(worldDir);
-  console.log("[WorldX] All systems initialized");
+  console.log("[World-Y] All systems initialized");
 
   app.get("/api/health", (_req, res) => {
     if (!appContext.hasWorld) {
@@ -87,6 +88,7 @@ async function main() {
   });
 
   // World creation & management routes work even without an active world.
+  app.use("/api/admin", adminRoutes);
   app.use("/api/worlds", worldsCreateRoutes);
 
   // Guard: all other API routes require an active world to be loaded.
@@ -124,12 +126,12 @@ async function main() {
 
   const PORT = process.env.PORT || 3100;
   server.listen(PORT, () => {
-    console.log(`[WorldX] Server running on http://localhost:${PORT}`);
-    console.log(`[WorldX] WebSocket available on ws://localhost:${PORT}`);
+    console.log(`[World-Y] Server running on http://localhost:${PORT}`);
+    console.log(`[World-Y] WebSocket available on ws://localhost:${PORT}`);
   });
 }
 
 main().catch((err) => {
-  console.error("[WorldX] Fatal error during startup:", err);
+  console.error("[World-Y] Fatal error during startup:", err);
   process.exit(1);
 });

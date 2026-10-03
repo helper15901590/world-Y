@@ -53,6 +53,11 @@ export function getAllCharacterStates(): CharacterState[] {
   return (getDb().prepare("SELECT * FROM character_states").all() as any[]).map(rowToState);
 }
 
+/** 删除某个角色的运行时状态（删除角色时清理当前时间线的数据）。 */
+export function deleteCharacterState(id: string): void {
+  getDb().prepare("DELETE FROM character_states WHERE character_id = ?").run(id);
+}
+
 export function updateCharacterState(id: string, patch: Partial<CharacterState>): void {
   const sets: string[] = [];
   const params: unknown[] = [];

@@ -110,6 +110,29 @@ export class WorldManager {
     return this.worldSocialContext;
   }
 
+  /**
+   * 运行期修改世界设定（管理面板「世界设定」）。
+   * worldSocialContext 按与启动时相同的规则重算：留空时回退到「世界简介」。
+   */
+  updateWorldPrompt(params: {
+    worldName?: string;
+    worldDescription?: string;
+    worldSocialContext?: string;
+  }): void {
+    if (typeof params.worldName === "string" && params.worldName.trim()) {
+      this.worldName = params.worldName.trim();
+    }
+    if (typeof params.worldDescription === "string") {
+      this.worldDescription = params.worldDescription.trim();
+    }
+    if (typeof params.worldSocialContext === "string") {
+      this.worldSocialContext = buildWorldSocialContext(
+        params.worldSocialContext,
+        this.worldDescription,
+      );
+    }
+  }
+
   getContentLanguage(): "zh" | "en" {
     return this.contentLanguage;
   }
@@ -491,6 +514,32 @@ export class WorldManager {
     const patch: Partial<ObjectRuntimeState> = { state: newState };
     if (description !== undefined) patch.stateDescription = description;
     worldState.updateObjectState(objectId, patch);
+  }
+
+  /** 管理面板「环境物品」：修改地点的名称/描述（仅内存；调用方负责写回 world.json）。 */
+  updateLocationMeta(
+    locationId: string,
+    patch: { name?: string; description?: string },
+  ): boolean {
+    const loc = this.locationConfigs.find((l) => l.id === locationId);
+    if (!loc) return false;
+    if (typeof patch.name === "string" && patch.name.trim()) {
+      loc.name = patch.name.trim();
+    }
+    if (typeof patch.description === "string") {
+      loc.description = patch.description;
+    }
+    return true;
+  }
+
+  /** 管理面板「环境物品」：修改物件的名称（仅内存；调用方负责写回 world.json）。 */
+  updateObjectMeta(objectId: string, patch: { name?: string }): boolean {
+    const config = this.findObjectConfig(objectId);
+    if (!config) return false;
+    if (typeof patch.name === "string" && patch.name.trim()) {
+      config.name = patch.name.trim();
+    }
+    return true;
   }
 
   characterStartUsingObject(objectId: string, characterId: string): boolean {
