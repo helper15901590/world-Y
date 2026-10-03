@@ -96,6 +96,19 @@ That's all it takes. World-Y handles the rest.
 
 > 🚧 The project is currently in Alpha — core features work, ongoing improvements ahead
 
+## What's new in World-Y
+
+On top of the original WorldX capabilities, this build adds a full **character & access-control layer**:
+
+- **Core quests** — give a character a one-line quest (typing it starts it, clearing it stops it). The character first plans its own action steps, then follows them and revises them when the situation changes. Quests steer what it does, where it moves (the action menu tags ★ task-related options and the ★ next hop toward the goal) and whom it asks about; when a quest names someone, the character recognizes that person and goes looking for them.
+- **Fully editable personas** — gender, age, department/position/title, skills, hobbies, fears, dislikes, background, values and speech habits are all editable in the UI, and **only what you can edit in the form feeds the prompts** (the old uneditable persona sources were removed). Edits apply instantly and are written back to the world config, surviving restarts.
+- **Access control** — the whole toolbar sits behind an admin password (default `1590`, set via `ADMIN_PASSWORD` in `.env`); every character has a 12-character edit password required for non-admin profile edits (never prefilled, with explicit error feedback); character names are globally unique.
+- **Status icons over heads** — 💭 idle / 💬 in conversation / 🚶 moving / per-action icons, plus a gold ★ when the character carries a core quest.
+- **In-app guide & background music** — a Help button with a detailed how-to-play (Chinese / English) and a light 8-bit background loop you can toggle.
+- **Helper scripts** (`scripts/`) — mirror-extend a map to 3× width, localize a world and its characters to Chinese, and synthesize the background music offline.
+
+> Built on top of [YGYOOO/WorldX](https://github.com/YGYOOO/WorldX).
+
 ## Quick Start
 
 ### Prerequisites
